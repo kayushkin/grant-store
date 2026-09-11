@@ -74,7 +74,10 @@ offers only what it names. As of 2026-09-11 it reads `can_use` for tools: a
 session created with `principal_id` is offered the granted tools its instance
 also has opted in (tool-store), provisioned by id; a principal with no such
 grant gets the instance's opt-ins unchanged (lenient, the operator's choice);
-`can_run_as`, `can_dispatch_on` and skills are stored but not read yet. A grant pairing a relation with a type outside its
+`can_dispatch_on` and `can_run_as` refuse a session outside them at
+create (403 `not_granted`) and at spawn, again leniently — a principal
+holding none of a relation is not restricted by it; skills are stored but not
+read yet. A grant pairing a relation with a type outside its
 list is a 400 naming the allowed types. Nothing is normalised: `Can_Use` is a
 400, not a rewrite.
 

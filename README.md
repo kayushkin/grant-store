@@ -21,7 +21,9 @@ A grant is `(principal, relation, resource)`. Relations are a fixed list served
 by `GET /relations`: `can_use` (tool, skill), `can_run_as` (agent),
 `can_dispatch_on` (instance, machine) are **enforced** — llm-bridge-server
 filters a session's offer by them; as of 2026-09-11 it reads `can_use` for
-tools at spawn, and the other two are not read yet — and `works_with` is advisory, the list
+tools at spawn and refuses a session outside its `can_dispatch_on` /
+`can_run_as` grants (a principal holding none of a relation is not
+restricted by it); skills are not read yet — and `works_with` is advisory, the list
 principal-store used to keep, moved here so there is one place to look.
 
 ## Run it

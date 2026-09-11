@@ -1,0 +1,186 @@
+# grant-store — API contract
+
+`127.0.0.1:8315`. The registry of grants: which principal (a human or a group
+from principal-store) stands in which relation to which resource — an agent,
+harness instance, machine, skill or tool. "Who may use what" lives here and
+nowhere else.
+
+Module `github.com/kayushkin/grant-store`, root package `grantstore`, binary
+`cmd/grant-store` installed at `~/bin/grant-store`. Env: `GRANT_STORE_ADDR`
+(default `127.0.0.1:8315`), `GRANT_STORE_DATA_DIR` (default
+`~/.config/grant-store`), and the owners a grant is checked against:
+`PRINCIPAL_STORE_URL` (default `http://127.0.0.1:8314`), `LLM_BRIDGE_URL`
+(`http://127.0.0.1:8160`, for agents, instances and machines),
+`SKILL_STORE_URL` (`http://127.0.0.1:8301`), `TOOL_STORE_URL`
+(`http://127.0.0.1:8302`) — the names dash and principal-store already use.
+SQLite at `<data dir>/grant-store.db`, WAL, `?_foreign_keys=on&_txlock=immediate`.
+
+Routes are rooted at `/`, the same as principal-store; dash adds the
+`/api/grants` prefix and the auth this service has none of. All timestamps are
+epoch seconds (`INTEGER`, 0 = unset).
+
+**The bind is `127.0.0.1`, deliberately, and it is part of this contract.**
+This service has no auth of its own and the front door (dash) is the only
+door. The unit sets `GRANT_STORE_ADDR=127.0.0.1:8315`, `main.go` defaults to
+the same, and `deploy.sh` fails if the port is listening anywhere else.
+
+No build tag is needed: there is no full-text index here.
+
+---
+
+## The one table
+
+### `grants`
+
+| Field | Meaning |
+|---|---|
+| `id` | `grant_000001`. What a session's audit points at |
+| `seq` | monotonic, assigned here; generates `id` |
+| `principal_id` | a principal-store id, human **or group**. Checked with principal-store on write; **not a foreign key** — it is another database's id |
+| `relation` | one of `GET /relations`; enforced in Go against `relation.go` |
+| `resource_type` | one of `GET /resource-types`; enforced in Go against `resource_type.go`, and must be a type the relation allows |
+| `resource_id` | the owner's id as text. Checked with the owner on write; not a foreign key |
+| `note` | free text, trimmed: why, for whoever reads the list later |
+| `granted_at` | |
+| `revoked_at` | 0 = active. **The only removal**; see below |
+
+A partial unique index on `(principal_id, relation, resource_type, resource_id)
+WHERE revoked_at = 0` is what makes granting the same tuple twice idempotent
+while still letting a revoked row and a fresh active row for the same tuple
+coexist.
+
+**There is no hard delete.** A grant is revoked, never removed, so a session
+that was offered a tool can always point at the grant that offered it, and a
+list with `include_revoked=true` is the full history.
+
+**There is no display name.** The owner renames things, so a copied name goes
+stale without anyone noticing; a UI resolves names live by id.
+
+---
+
+## The relation vocabulary
+
+Served by `GET /relations`, never hardcoded by a caller:
+
+| Relation | Applies to | Enforced | Meaning |
+|---|---|---|---|
+| `can_use` | tool, skill | yes | may be offered this tool or skill in a session started as this principal |
+| `can_run_as` | agent | yes | may start a session as this agent |
+| `can_dispatch_on` | instance, machine | yes | may start a session on this instance or machine |
+| `works_with` | agent, instance, machine, skill, tool | **no** | advisory: what this principal usually works with. A card's dispatch picker reads it to put an assignee's instances first. Nothing refuses anything because of it |
+
+**Enforced** means llm-bridge-server reads the relation at session start and
+offers only what it names. A grant pairing a relation with a type outside its
+list is a 400 naming the allowed types. Nothing is normalised: `Can_Use` is a
+400, not a rewrite.
+
+`works_with` is the list principal-store used to keep as `principal_resources`
+(2026-09-10 to 2026-09-11), moved here so there is one place to look.
+
+---
+
+## Routes
+
+Errors are `{"error":"…"}`. Status mapping: not found → **404**; a malformed
+or self-contradictory grant, or an id its owner says does not exist → **400**;
+principal-store or a resource owner that could not be asked → **502** (nothing
+is written); anything else → 500.
+
+### `GET /health`
+
+`{"status":"ok","counts":{"grants":N,"active":N,"revoked":N,"principals":N}}` —
+`principals` is distinct principals holding an active grant.
+
+### `GET /relations`
+
+The table above as JSON: `[{"name","resource_types":[…],"enforced":bool,"description"}]`,
+in the order shown.
+
+### `GET /resource-types`
+
+`["agent","instance","machine","skill","tool"]` — the same five names as
+kanban-store's entity-type registry and principal-store.
+
+### `GET /grants`
+
+Query: `principal_id`, `relation`, `resource_type`, `resource_id`,
+`include_revoked`, `limit`, `offset`. Every filter is optional and they
+combine. Ordered by `resource_type, resource_id, relation, principal_id, seq`.
+Bare array, `[]` when empty. An unknown `relation` or `resource_type` is a
+**400** naming the vocabulary, never an empty answer, so a misspelling is not
+read as "nobody has this".
+
+`GET /grants?resource_type=tool&resource_id=13` is the reverse lookup: who
+holds a grant on this tool.
+
+### `POST /grants`
+
+Body, decoded strictly (an unknown key is a 400):
+
+```json
+{"principal_id":"principal_000006","relation":"can_use","resource_type":"tool","resource_id":"13","note":"Playwright for e2e"}
+```
+
+Checks, in the order a caller can act on them: the relation, the resource type
+and whether the relation allows it, the id shapes (`principal_…`; a numeric id
+must be a plain decimal integer — a slug or a name is a 400 saying which id is
+wanted), then **principal-store** is asked whether the principal exists, then
+the **resource's owner** is asked whether the resource exists. Both owners are
+asked before anything is written.
+
+**201** with the grant when this call wrote it; **200** with the stored row
+when an identical active tuple already exists (same `granted_at`, same
+`note` — the repeat does not overwrite). A disabled principal and a disabled
+resource are both accepted: the grant is dormant, and comes back with them.
+
+### `GET /grants/{id}`
+
+The grant, revoked or not. 404 if no such id.
+
+### `POST /grants/{id}/revoke`
+
+**200** with the grant. Idempotent: an already-revoked grant is returned with
+its original `revoked_at`. 404 if no such id. Never asks an owner — a grant on
+a resource that was deleted upstream is exactly the one most in need of
+revoking, and an owner that is down must not pin a grant in place.
+
+### `GET /principals/{id}/effective`
+
+**The read llm-bridge-server makes at session start.** Every active grant the
+principal holds, directly or through an active group it belongs to. Query:
+`relation`, `resource_type` (optional filters, same vocabulary rules as
+`GET /grants`).
+
+Groups come **live from principal-store** on every call (`GET
+/principals/{id}` there, which expands a human's active groups), so a
+membership change shows at the next session start without this store being
+told. A group's own effective set is its own rows: groups do not nest.
+
+Each row is the grant as stored, so its `principal_id` says whether it is the
+principal's own (equal to the id asked for) or inherited (a group's id). The
+same resource granted both ways appears twice, because both are true, and
+whoever is about to revoke the direct one needs to see the group still carries
+it. Ordered by `resource_type, resource_id, relation`, the principal's own row
+before inherited ones, then `principal_id`.
+
+A principal principal-store does not know is **404**; a principal-store that
+could not be asked is **502** — **never an empty list**, because an empty list
+would start a session with nothing offered and no explanation.
+
+---
+
+## Owner checks
+
+| `resource_type` | Owner asked | Id wanted |
+|---|---|---|
+| `agent` | llm-bridge-server `GET /agents`, scanned for the numeric id | agent-store's `agents.id`. The slug is refused: agent-store lets it be renamed |
+| `instance` | llm-bridge-server `GET /instances/{id}` | harness-store's instance id, e.g. `inst-cc-local` |
+| `machine` | llm-bridge-server `GET /machines/{id}` | harness-store's machine id, e.g. `m_localhost` |
+| `skill` | skill-store `GET /skills/{id}` | skill-store's numeric `skills.id` |
+| `tool` | tool-store `GET /tools/{id}` | tool-store's numeric `tools.id` |
+| principal | principal-store `GET /principals/{id}` | `principal_000001`, human or group |
+
+Each call has a 3 s timeout. A 404 whose body is Go's own `404 page not found`
+(or, for principal-store, a 404 with no JSON error) is reported as a
+misconfigured URL — a 502 naming the env var — not as a missing record, because
+every owner answers a missing record with its own text.

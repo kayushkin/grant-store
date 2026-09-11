@@ -20,7 +20,8 @@ principal's effective set at session start and offers only what it names.
 A grant is `(principal, relation, resource)`. Relations are a fixed list served
 by `GET /relations`: `can_use` (tool, skill), `can_run_as` (agent),
 `can_dispatch_on` (instance, machine) are **enforced** — llm-bridge-server
-filters a session's offer by them — and `works_with` is advisory, the list
+filters a session's offer by them; as of 2026-09-11 it reads `can_use` for
+tools at spawn, and the other two are not read yet — and `works_with` is advisory, the list
 principal-store used to keep, moved here so there is one place to look.
 
 ## Run it

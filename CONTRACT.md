@@ -70,7 +70,11 @@ Served by `GET /relations`, never hardcoded by a caller:
 | `works_with` | agent, instance, machine, skill, tool | **no** | advisory: what this principal usually works with. A card's dispatch picker reads it to put an assignee's instances first. Nothing refuses anything because of it |
 
 **Enforced** means llm-bridge-server reads the relation at session start and
-offers only what it names. A grant pairing a relation with a type outside its
+offers only what it names. As of 2026-09-11 it reads `can_use` for tools: a
+session created with `principal_id` is offered the granted tools its instance
+also has opted in (tool-store), provisioned by id; a principal with no such
+grant gets the instance's opt-ins unchanged (lenient, the operator's choice);
+`can_run_as`, `can_dispatch_on` and skills are stored but not read yet. A grant pairing a relation with a type outside its
 list is a 400 naming the allowed types. Nothing is normalised: `Can_Use` is a
 400, not a rewrite.
 

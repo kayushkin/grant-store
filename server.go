@@ -18,13 +18,19 @@ import (
 // directory is principal-store and checker is the resource owners. Both are
 // required: a nil one panics here, at boot, rather than at the first POST.
 func RegisterHandlers(mux *http.ServeMux, s *Store, directory PrincipalDirectory, checker ResourceChecker) {
+	registerHandlers(mux, s, directory, checker, nil)
+}
+
+// registerHandlers mounts the routes; enforcement nil means every caller is
+// unrestricted. See principal_enforcement.go.
+func registerHandlers(mux *http.ServeMux, s *Store, directory PrincipalDirectory, checker ResourceChecker, enforcement *PrincipalEnforcement) {
 	if directory == nil {
 		panic("grant-store: RegisterHandlers needs a PrincipalDirectory; without one a grant's principal cannot be checked against principal-store")
 	}
 	if checker == nil {
 		panic("grant-store: RegisterHandlers needs a ResourceChecker; without one a grant's resource cannot be checked against its owner")
 	}
-	h := &handler{s: s, directory: directory, checker: checker}
+	h := &handler{s: s, directory: directory, checker: checker, enforcement: enforcement}
 	mux.HandleFunc("GET /health", h.health)
 	mux.HandleFunc("GET /relations", h.relations)
 	mux.HandleFunc("GET /resource-types", h.resourceTypes)
@@ -38,9 +44,10 @@ func RegisterHandlers(mux *http.ServeMux, s *Store, directory PrincipalDirectory
 }
 
 type handler struct {
-	s         *Store
-	directory PrincipalDirectory
-	checker   ResourceChecker
+	s           *Store
+	directory   PrincipalDirectory
+	checker     ResourceChecker
+	enforcement *PrincipalEnforcement
 }
 
 func (h *handler) health(w http.ResponseWriter, r *http.Request) {
@@ -60,7 +67,25 @@ func (h *handler) resourceTypes(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handler) listGrants(w http.ResponseWriter, r *http.Request) {
+	caller, identified := h.identifyCaller(w, r)
+	if !identified {
+		return
+	}
 	q := r.URL.Query()
+	if !caller.unrestricted && q.Get("principal_id") != caller.principalID {
+		if q.Get("resource_type") != ResourceTypeBoard || q.Get("resource_id") == "" {
+			writeErr(w, http.StatusForbidden, "a principal lists grants with principal_id set to itself, or with resource_type=board and the resource_id of a board it administers")
+			return
+		}
+		administers, err := h.callerAdministersBoard(r, caller, q.Get("resource_id"))
+		if respondStoreError(w, err) {
+			return
+		}
+		if !administers {
+			writeErr(w, http.StatusForbidden, "listing the grants on board "+q.Get("resource_id")+" needs can_administer on it")
+			return
+		}
+	}
 	grants, err := h.s.List(Filter{
 		PrincipalID:    q.Get("principal_id"),
 		Relation:       q.Get("relation"),
@@ -78,8 +103,26 @@ func (h *handler) listGrants(w http.ResponseWriter, r *http.Request) {
 
 func (h *handler) createGrant(w http.ResponseWriter, r *http.Request) {
 	var request GrantRequest
+	caller, identified := h.identifyCaller(w, r)
+	if !identified {
+		return
+	}
 	if !decode(w, r, &request) {
 		return
+	}
+	if !caller.unrestricted {
+		if request.ResourceType != ResourceTypeBoard {
+			writeErr(w, http.StatusForbidden, fmt.Sprintf("a principal may grant only on boards it administers; a %q grant needs the service token", request.ResourceType))
+			return
+		}
+		administers, err := h.callerAdministersBoard(r, caller, request.ResourceID)
+		if respondStoreError(w, err) {
+			return
+		}
+		if !administers {
+			writeErr(w, http.StatusForbidden, "granting on board "+request.ResourceID+" needs can_administer on it")
+			return
+		}
 	}
 	grant, created, err := h.s.Create(r.Context(), h.directory, h.checker, request)
 	if respondStoreError(w, err) {
@@ -93,14 +136,55 @@ func (h *handler) createGrant(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handler) getGrant(w http.ResponseWriter, r *http.Request) {
+	caller, identified := h.identifyCaller(w, r)
+	if !identified {
+		return
+	}
 	grant, err := h.s.Get(r.PathValue("id"))
 	if respondStoreError(w, err) {
+		return
+	}
+	mayRead, err := h.callerMayReadGrant(r, caller, grant)
+	if respondStoreError(w, err) {
+		return
+	}
+	if !mayRead {
+		writeErr(w, http.StatusNotFound, fmt.Sprintf("%s: grant %s", ErrNotFound, grant.ID))
 		return
 	}
 	writeJSON(w, http.StatusOK, grant)
 }
 
 func (h *handler) revokeGrant(w http.ResponseWriter, r *http.Request) {
+	caller, identified := h.identifyCaller(w, r)
+	if !identified {
+		return
+	}
+	if !caller.unrestricted {
+		existing, err := h.s.Get(r.PathValue("id"))
+		if respondStoreError(w, err) {
+			return
+		}
+		mayRead, err := h.callerMayReadGrant(r, caller, existing)
+		if respondStoreError(w, err) {
+			return
+		}
+		if !mayRead {
+			writeErr(w, http.StatusNotFound, fmt.Sprintf("%s: grant %s", ErrNotFound, existing.ID))
+			return
+		}
+		administers := false
+		if existing.ResourceType == ResourceTypeBoard {
+			administers, err = h.callerAdministersBoard(r, caller, existing.ResourceID)
+			if respondStoreError(w, err) {
+				return
+			}
+		}
+		if !administers {
+			writeErr(w, http.StatusForbidden, "revoking a grant needs can_administer on its board; other grants need the service token")
+			return
+		}
+	}
 	grant, err := h.s.Revoke(r.PathValue("id"))
 	if respondStoreError(w, err) {
 		return
@@ -109,6 +193,14 @@ func (h *handler) revokeGrant(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handler) effective(w http.ResponseWriter, r *http.Request) {
+	caller, identified := h.identifyCaller(w, r)
+	if !identified {
+		return
+	}
+	if !caller.unrestricted && r.PathValue("id") != caller.principalID {
+		writeErr(w, http.StatusForbidden, "a principal reads only its own effective grants")
+		return
+	}
 	q := r.URL.Query()
 	grants, err := h.s.Effective(r.Context(), h.directory, r.PathValue("id"), q.Get("relation"), q.Get("resource_type"))
 	if respondStoreError(w, err) {

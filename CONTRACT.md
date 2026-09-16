@@ -203,3 +203,32 @@ Each call has a 3 s timeout. A 404 whose body is Go's own `404 page not found`
 (or, for principal-store, a 404 with no JSON error) is reported as a
 misconfigured URL — a 502 naming the env var — not as a missing record, because
 every owner answers a missing record with its own text.
+
+---
+
+## Principal enforcement
+
+Off unless `GRANT_STORE_PRINCIPAL_ENFORCEMENT=required`, which also needs
+`GRANT_STORE_SERVICE_TOKEN` (at least 32 characters; no default). With it on,
+every route except `/health`, `/relations` and `/resource-types` needs either:
+
+- `X-Grant-Store-Service-Token` — an internal service or an operator;
+  unrestricted. llm-bridge-server's spawn-time read and kanban-store's
+  per-request board read both send it.
+- `X-Principal-Id` — set by a gateway from a verified login, trusted as sent, so
+  users must reach this store only through that gateway. The principal must be
+  an active human in principal-store.
+
+Neither, a wrong token, or an unknown, disabled or group principal is **401**.
+principal-store that cannot be asked is **502**.
+
+| Route | A principal may |
+|---|---|
+| `POST /grants` | grant on a **board** it holds `can_administer` on (directly or through a group); any other resource type is **403** |
+| `POST /grants/{id}/revoke` | revoke a grant on a board it administers; **404** if it could not read the grant, **403** if it can read it but does not administer the board |
+| `GET /grants/{id}` | read a grant it holds, or any grant on a board it administers; otherwise **404** |
+| `GET /grants` | list with `principal_id` set to itself, or with `resource_type=board&resource_id=` a board it administers; otherwise **403** |
+| `GET /principals/{id}/effective` | read its own; otherwise **403** |
+
+A board administrator may grant `can_administer` to others: handing a board over
+is part of administering it.

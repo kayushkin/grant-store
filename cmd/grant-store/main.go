@@ -45,7 +45,20 @@ func main() {
 		principalStoreURL, llmBridgeServerURL, skillStoreURL, toolStoreURL, kanbanStoreURL, kanbanStoreServiceToken != "")
 
 	mux := http.NewServeMux()
-	grantstore.RegisterHandlers(mux, store, directory, checker)
+	switch enforcement := os.Getenv("GRANT_STORE_PRINCIPAL_ENFORCEMENT"); enforcement {
+	case "":
+		grantstore.RegisterHandlers(mux, store, directory, checker)
+		log.Printf("principal enforcement: off; every caller may read and write every grant")
+	case "required":
+		serviceToken := os.Getenv("GRANT_STORE_SERVICE_TOKEN")
+		if len(serviceToken) < 32 {
+			log.Fatal("GRANT_STORE_PRINCIPAL_ENFORCEMENT=required needs GRANT_STORE_SERVICE_TOKEN of at least 32 characters")
+		}
+		grantstore.RegisterHandlersWithPrincipalEnforcement(mux, store, directory, checker, grantstore.PrincipalEnforcement{ServiceToken: serviceToken})
+		log.Printf("principal enforcement: on; requests need X-Principal-Id or the service token")
+	default:
+		log.Fatalf("GRANT_STORE_PRINCIPAL_ENFORCEMENT=%q: leave it unset for no enforcement or set it to \"required\"", enforcement)
+	}
 
 	srv := &http.Server{
 		Addr:              addr,

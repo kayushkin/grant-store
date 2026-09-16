@@ -8,9 +8,11 @@ import (
 
 // The resource-type vocabulary is served (GET /resource-types) for the same
 // reason relations are: no caller builds a picker out of whatever values happen to
-// be in the rows. The five names are exactly the type names in kanban-store's
-// entity-type registry, so a card link and a grant spell a
-// type the same way and a ref moves between them untranslated.
+// be in the rows. agent, instance, machine, skill and tool are exactly the type
+// names in kanban-store's entity-type registry, so a card link and a grant
+// spell a type the same way and a ref moves between them untranslated. board is
+// kanban-store's own board, which that registry does not list because a board
+// is the container cards sit in, not something a card links to.
 //
 // Unlike kind, nothing here is normalised — not case, not whitespace. The type
 // and the id arrive in a request and are stored as the join key, so a grant on
@@ -23,6 +25,7 @@ const (
 	ResourceTypeMachine  = "machine"
 	ResourceTypeSkill    = "skill"
 	ResourceTypeTool     = "tool"
+	ResourceTypeBoard    = "board"
 )
 
 // resourceTypeDefinition is everything this store knows about one resource
@@ -74,6 +77,11 @@ var resourceTypeDefinitions = []resourceTypeDefinition{
 		idDescription: "tool-store's numeric tools.id, e.g. 12",
 		numericID:     true,
 		nameIsNotAnID: "the tool name is not accepted: two tools can share one",
+	},
+	{
+		name:          ResourceTypeBoard,
+		owner:         "kanban-store",
+		idDescription: "kanban-store's board id, e.g. c9084eb1-be11-48b7-8579-e77c6ffbe8c2",
 	},
 }
 

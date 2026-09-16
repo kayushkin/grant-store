@@ -32,6 +32,16 @@ func newOwnerServer(t *testing.T, agentsBody string, agentsStatus int) *httptest
 		case "/tools/4":
 			w.WriteHeader(http.StatusNotFound)
 			w.Write([]byte(`{"error":"tool not found"}`))
+		case "/api/boards/board-exists":
+			if r.Header.Get(KanbanStoreServiceTokenHeader) != "kanban-service-token" {
+				w.WriteHeader(http.StatusUnauthorized)
+				w.Write([]byte(`{"error":"no principal and no service token"}`))
+				return
+			}
+			w.Write([]byte(`{"id":"board-exists"}`))
+		case "/api/boards/board-gone":
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte(`{"error":"not found"}`))
 		case "/machines/m_boom":
 			http.Error(w, "boom", http.StatusInternalServerError)
 		default:
@@ -43,7 +53,30 @@ func newOwnerServer(t *testing.T, agentsBody string, agentsStatus int) *httptest
 }
 
 func newCheckerAgainst(srv *httptest.Server) *HTTPResourceChecker {
-	return NewHTTPResourceChecker(srv.URL+"/", srv.URL, srv.URL)
+	return NewHTTPResourceChecker(srv.URL+"/", srv.URL, srv.URL, srv.URL, "kanban-service-token")
+}
+
+// TestBoardCheckSendsTheKanbanServiceToken pins the one owner that is asked
+// with a credential: an enforcing kanban-store answers a bare request with 401,
+// and that must read as an owner that could not answer, not a missing board.
+func TestBoardCheckSendsTheKanbanServiceToken(t *testing.T) {
+	srv := newOwnerServer(t, `[]`, http.StatusOK)
+	ctx := context.Background()
+	if err := newCheckerAgainst(srv).CheckResourceExists(ctx, ResourceTypeBoard, "board-exists"); err != nil {
+		t.Fatalf("existing board with the token: %v", err)
+	}
+	err := newCheckerAgainst(srv).CheckResourceExists(ctx, ResourceTypeBoard, "board-gone")
+	if !errors.Is(err, ErrResourceNotFound) {
+		t.Fatalf("missing board: want ErrResourceNotFound, got %v", err)
+	}
+	withoutToken := NewHTTPResourceChecker(srv.URL, srv.URL, srv.URL, srv.URL, "")
+	err = withoutToken.CheckResourceExists(ctx, ResourceTypeBoard, "board-exists")
+	if err == nil || errors.Is(err, ErrResourceNotFound) {
+		t.Fatalf("board check without the token: want an owner failure that is not ErrResourceNotFound, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "401") {
+		t.Fatalf("board check without the token should quote kanban-store's 401, got %v", err)
+	}
 }
 
 func TestHTTPCheckerReadsTheOwnersAnswer(t *testing.T) {
@@ -88,7 +121,7 @@ func TestHTTPCheckerReportsAFailingOwnerAsAFailureNotAMissingResource(t *testing
 
 	// A base URL pointing at a service without the route answers Go's unrouted
 	// 404. That is a misconfiguration, not a missing instance.
-	unrouted := NewHTTPResourceChecker(srv.URL+"/wrong-prefix", srv.URL, srv.URL)
+	unrouted := NewHTTPResourceChecker(srv.URL+"/wrong-prefix", srv.URL, srv.URL, srv.URL, "")
 	err = unrouted.CheckResourceExists(ctx, ResourceTypeInstance, "inst-cc-local")
 	if err == nil || errors.Is(err, ErrResourceNotFound) || !strings.Contains(err.Error(), "LLM_BRIDGE_URL") {
 		t.Fatalf("unrouted 404: err = %v, want a failure naming LLM_BRIDGE_URL", err)
@@ -115,7 +148,7 @@ func TestHTTPCheckerReportsAFailingOwnerAsAFailureNotAMissingResource(t *testing
 	gone := httptest.NewServer(http.NotFoundHandler())
 	goneURL := gone.URL
 	gone.Close()
-	err = NewHTTPResourceChecker(goneURL, goneURL, goneURL).CheckResourceExists(ctx, ResourceTypeSkill, "7")
+	err = NewHTTPResourceChecker(goneURL, goneURL, goneURL, goneURL, "").CheckResourceExists(ctx, ResourceTypeSkill, "7")
 	if err == nil || errors.Is(err, ErrResourceNotFound) || !strings.Contains(err.Error(), "did not answer") {
 		t.Fatalf("unreachable: err = %v", err)
 	}
@@ -129,7 +162,7 @@ func TestHTTPCheckerTimesOut(t *testing.T) {
 		}
 	}))
 	t.Cleanup(slow.Close)
-	checker := NewHTTPResourceChecker(slow.URL, slow.URL, slow.URL)
+	checker := NewHTTPResourceChecker(slow.URL, slow.URL, slow.URL, slow.URL, "")
 	if checker.client.Timeout != ownerCheckTimeout || ownerCheckTimeout != 3*time.Second {
 		t.Fatalf("client timeout = %v, want 3s", checker.client.Timeout)
 	}

@@ -34,10 +34,21 @@ const (
 	DefaultLLMBridgeServerURL = "http://127.0.0.1:8160"
 	DefaultSkillStoreURL      = "http://127.0.0.1:8301"
 	DefaultToolStoreURL       = "http://127.0.0.1:8302"
+	DefaultKanbanStoreURL     = "http://127.0.0.1:8305"
 
 	llmBridgeServerURLVariable = "LLM_BRIDGE_URL"
 	skillStoreURLVariable      = "SKILL_STORE_URL"
 	toolStoreURLVariable       = "TOOL_STORE_URL"
+	kanbanStoreURLVariable     = "KANBAN_STORE_URL"
+	// kanbanStoreServiceTokenVariable holds the token kanban-store accepts from
+	// internal services when it enforces principals. Without it a board check
+	// against an enforcing kanban-store is a 401, reported as the owner being
+	// unable to answer — never as the board not existing.
+	kanbanStoreServiceTokenVariable = "KANBAN_STORE_SERVICE_TOKEN"
+	// KanbanStoreServiceTokenHeader is the header kanban-store reads that token
+	// from. Declared in kanban-store's internal/api/principal_access.go too;
+	// the two must match.
+	KanbanStoreServiceTokenHeader = "X-Kanban-Store-Service-Token"
 )
 
 // LLMBridgeServerURL is where agents, harness instances and machines are
@@ -51,6 +62,14 @@ func SkillStoreURL() string { return environmentOr(skillStoreURLVariable, Defaul
 
 // ToolStoreURL is where tools are checked, read from TOOL_STORE_URL.
 func ToolStoreURL() string { return environmentOr(toolStoreURLVariable, DefaultToolStoreURL) }
+
+// KanbanStoreURL is where boards are checked, read from KANBAN_STORE_URL.
+func KanbanStoreURL() string { return environmentOr(kanbanStoreURLVariable, DefaultKanbanStoreURL) }
+
+// KanbanStoreServiceToken is sent on board checks, read from
+// KANBAN_STORE_SERVICE_TOKEN. Empty sends no token, which is right for a
+// kanban-store that does not enforce principals.
+func KanbanStoreServiceToken() string { return os.Getenv(kanbanStoreServiceTokenVariable) }
 
 func environmentOr(variable, fallback string) string {
 	if value := os.Getenv(variable); value != "" {
@@ -69,16 +88,22 @@ type HTTPResourceChecker struct {
 	llmBridgeServerURL string
 	skillStoreURL      string
 	toolStoreURL       string
-	client             *http.Client
+	kanbanStoreURL     string
+	// kanbanStoreServiceToken is sent to kanban-store only, and only when set.
+	kanbanStoreServiceToken string
+	client                  *http.Client
 }
 
 // NewHTTPResourceChecker builds a checker against the given base URLs.
-func NewHTTPResourceChecker(llmBridgeServerURL, skillStoreURL, toolStoreURL string) *HTTPResourceChecker {
+// kanbanStoreServiceToken may be empty; see KanbanStoreServiceToken.
+func NewHTTPResourceChecker(llmBridgeServerURL, skillStoreURL, toolStoreURL, kanbanStoreURL, kanbanStoreServiceToken string) *HTTPResourceChecker {
 	return &HTTPResourceChecker{
-		llmBridgeServerURL: strings.TrimSuffix(llmBridgeServerURL, "/"),
-		skillStoreURL:      strings.TrimSuffix(skillStoreURL, "/"),
-		toolStoreURL:       strings.TrimSuffix(toolStoreURL, "/"),
-		client:             &http.Client{Timeout: ownerCheckTimeout},
+		llmBridgeServerURL:      strings.TrimSuffix(llmBridgeServerURL, "/"),
+		skillStoreURL:           strings.TrimSuffix(skillStoreURL, "/"),
+		toolStoreURL:            strings.TrimSuffix(toolStoreURL, "/"),
+		kanbanStoreURL:          strings.TrimSuffix(kanbanStoreURL, "/"),
+		kanbanStoreServiceToken: kanbanStoreServiceToken,
+		client:                  &http.Client{Timeout: ownerCheckTimeout},
 	}
 }
 
@@ -99,6 +124,9 @@ func (c *HTTPResourceChecker) CheckResourceExists(ctx context.Context, resourceT
 	case ResourceTypeTool:
 		return c.checkByGet(ctx, "tool-store", toolStoreURLVariable,
 			c.toolStoreURL+"/tools/"+url.PathEscape(resourceID))
+	case ResourceTypeBoard:
+		return c.checkByGet(ctx, "kanban-store", kanbanStoreURLVariable,
+			c.kanbanStoreURL+"/api/boards/"+url.PathEscape(resourceID))
 	}
 	// Unreachable through the store, which validates the type first. Reaching it
 	// means a type was added to resource_type.go without an owner check here.
@@ -112,6 +140,9 @@ func (c *HTTPResourceChecker) get(ctx context.Context, owner, requestURL string)
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, nil)
 	if err != nil {
 		return nil, nil, fmt.Errorf("build GET %s: %w", requestURL, err)
+	}
+	if owner == "kanban-store" && c.kanbanStoreServiceToken != "" {
+		request.Header.Set(KanbanStoreServiceTokenHeader, c.kanbanStoreServiceToken)
 	}
 	response, err := c.client.Do(request)
 	if err != nil {

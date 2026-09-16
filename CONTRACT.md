@@ -67,6 +67,9 @@ Served by `GET /relations`, never hardcoded by a caller:
 | `can_use` | tool, skill | yes | may be offered this tool or skill in a session started as this principal |
 | `can_run_as` | agent | yes | may start a session as this agent |
 | `can_dispatch_on` | instance, machine | yes | may start a session on this instance or machine |
+| `can_view` | board | yes (kanban-store) | may see this kanban board and its cards |
+| `can_edit` | board | yes (kanban-store) | may create, move, assign and annotate cards on this board; includes `can_view` |
+| `can_administer` | board | yes (kanban-store) | may change the board's settings, columns, rules and triggers, or delete it; includes `can_edit` |
 | `works_with` | agent, instance, machine, skill, tool | **no** | advisory: what this principal usually works with. A card's dispatch picker reads it to put an assignee's instances first. Nothing refuses anything because of it |
 
 **Enforced** means llm-bridge-server reads the relation at session start and
@@ -80,6 +83,14 @@ holding none of a relation is not restricted by it; skills are stored but not
 read yet. A grant pairing a relation with a type outside its
 list is a 400 naming the allowed types. Nothing is normalised: `Can_Use` is a
 400, not a rewrite.
+
+The three board relations are stored as independent tuples. **kanban-store**,
+not this store, decides that `can_administer` includes `can_edit` and `can_edit`
+includes `can_view`, and it enforces them only when started with principal
+enforcement on (see kanban-store's README). A kanban-store that enforces
+answers a request with neither a principal nor its service token with 401, so
+`KANBAN_STORE_SERVICE_TOKEN` must be set here for board grants to be written;
+without it every board grant is a 502 quoting that 401.
 
 `works_with` is the list principal-store used to keep as `principal_resources`
 (2026-09-10 to 2026-09-11), moved here so there is one place to look.
@@ -185,6 +196,7 @@ would start a session with nothing offered and no explanation.
 | `machine` | llm-bridge-server `GET /machines/{id}` | harness-store's machine id, e.g. `m_localhost` |
 | `skill` | skill-store `GET /skills/{id}` | skill-store's numeric `skills.id` |
 | `tool` | tool-store `GET /tools/{id}` | tool-store's numeric `tools.id` |
+| `board` | kanban-store `GET /api/boards/{id}`, sending `X-Kanban-Store-Service-Token` from `KANBAN_STORE_SERVICE_TOKEN` when set | kanban-store's board id (a uuid) |
 | principal | principal-store `GET /principals/{id}` | `principal_000001`, human or group |
 
 Each call has a 3 s timeout. A 404 whose body is Go's own `404 page not found`

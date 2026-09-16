@@ -78,7 +78,7 @@ func decodeGrants(t *testing.T, body []byte) []Grant {
 func TestVocabularyRoutes(t *testing.T) {
 	srv := newTestServer(t)
 	status, body := do(t, srv, "GET", "/resource-types", nil)
-	if status != http.StatusOK || strings.TrimSpace(string(body)) != `["agent","instance","machine","skill","tool"]` {
+	if status != http.StatusOK || strings.TrimSpace(string(body)) != `["agent","instance","machine","skill","tool","board"]` {
 		t.Fatalf("GET /resource-types = %d: %s", status, body)
 	}
 	status, body = do(t, srv, "GET", "/relations", nil)
@@ -89,7 +89,8 @@ func TestVocabularyRoutes(t *testing.T) {
 	if err := json.Unmarshal(body, &relations); err != nil {
 		t.Fatal(err)
 	}
-	if len(relations) != 4 || relations[0].Name != "can_use" || !relations[0].Enforced || relations[3].Name != "works_with" || relations[3].Enforced {
+	if len(relations) != 7 || relations[0].Name != "can_use" || !relations[0].Enforced || relations[6].Name != "works_with" || relations[6].Enforced ||
+		relations[3].Name != "can_view" || relations[4].Name != "can_edit" || relations[5].Name != "can_administer" || relations[3].ResourceTypes[0] != "board" {
 		t.Fatalf("relations = %+v", relations)
 	}
 	status, body = do(t, srv, "GET", "/health", nil)

@@ -37,10 +37,12 @@ func main() {
 	llmBridgeServerURL := grantstore.LLMBridgeServerURL()
 	skillStoreURL := grantstore.SkillStoreURL()
 	toolStoreURL := grantstore.ToolStoreURL()
+	kanbanStoreURL := grantstore.KanbanStoreURL()
+	kanbanStoreServiceToken := grantstore.KanbanStoreServiceToken()
 	directory := grantstore.NewHTTPPrincipalDirectory(principalStoreURL)
-	checker := grantstore.NewHTTPResourceChecker(llmBridgeServerURL, skillStoreURL, toolStoreURL)
-	log.Printf("owners: principal-store=%s llm-bridge-server=%s skill-store=%s tool-store=%s",
-		principalStoreURL, llmBridgeServerURL, skillStoreURL, toolStoreURL)
+	checker := grantstore.NewHTTPResourceChecker(llmBridgeServerURL, skillStoreURL, toolStoreURL, kanbanStoreURL, kanbanStoreServiceToken)
+	log.Printf("owners: principal-store=%s llm-bridge-server=%s skill-store=%s tool-store=%s kanban-store=%s (service token set: %t)",
+		principalStoreURL, llmBridgeServerURL, skillStoreURL, toolStoreURL, kanbanStoreURL, kanbanStoreServiceToken != "")
 
 	mux := http.NewServeMux()
 	grantstore.RegisterHandlers(mux, store, directory, checker)

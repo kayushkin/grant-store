@@ -10,6 +10,12 @@ import (
 // the resource types it may pair with; a grant pairing a relation with a type
 // outside that list is a 400 naming the allowed ones.
 //
+// can_view, can_edit and can_administer are board access, enforced by
+// kanban-store when it runs with principal enforcement on. This store keeps
+// them as three independent tuples; kanban-store decides that can_administer
+// includes can_edit and can_edit includes can_view, because what a relation on
+// a board lets someone do is the board owner's rule, not this store's.
+//
 // Enforced relations are the ones llm-bridge-server reads at session start:
 // a session with a principal is offered only the tools and skills it can_use,
 // may only run as an agent it can_run_as, and may only start on an instance
@@ -25,6 +31,9 @@ const (
 	RelationCanRunAs      = "can_run_as"
 	RelationCanDispatchOn = "can_dispatch_on"
 	RelationWorksWith     = "works_with"
+	RelationCanView       = "can_view"
+	RelationCanEdit       = "can_edit"
+	RelationCanAdminister = "can_administer"
 )
 
 // RelationDefinition is everything a caller needs to offer one relation.
@@ -57,6 +66,24 @@ var Relations = []RelationDefinition{
 		ResourceTypes: []string{ResourceTypeInstance, ResourceTypeMachine},
 		Enforced:      true,
 		Description:   "may start a session on this harness instance or machine",
+	},
+	{
+		Name:          RelationCanView,
+		ResourceTypes: []string{ResourceTypeBoard},
+		Enforced:      true,
+		Description:   "may see this kanban board and its cards; kanban-store enforces it",
+	},
+	{
+		Name:          RelationCanEdit,
+		ResourceTypes: []string{ResourceTypeBoard},
+		Enforced:      true,
+		Description:   "may create, move, assign and annotate cards on this kanban board, and includes can_view; kanban-store enforces it",
+	},
+	{
+		Name:          RelationCanAdminister,
+		ResourceTypes: []string{ResourceTypeBoard},
+		Enforced:      true,
+		Description:   "may change this kanban board's settings, columns, rules and triggers, or delete it, and includes can_edit; kanban-store enforces it",
 	},
 	{
 		Name:          RelationWorksWith,

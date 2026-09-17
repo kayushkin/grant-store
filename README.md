@@ -49,7 +49,7 @@ listening anywhere but `127.0.0.1`.
 curl -s -X POST http://127.0.0.1:8315/grants -H 'Content-Type: application/json' \
   -d '{"principal_id":"principal_000006","relation":"can_use","resource_type":"tool","resource_id":"13","note":"e2e"}'
 
-# What a session started as Vlad would be offered — his own grants plus his groups'
+# What a session started as Slava would be offered — his own grants plus his groups'
 curl -s http://127.0.0.1:8315/principals/principal_000001/effective
 curl -s "http://127.0.0.1:8315/principals/principal_000001/effective?relation=can_use&resource_type=tool"
 

@@ -18,7 +18,7 @@ func newPrincipalStoreServer(t *testing.T) *httptest.Server {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.EscapedPath() {
 		case "/principals/principal_000001":
-			w.Write([]byte(`{"id":"principal_000001","seq":1,"kind":"human","display_name":"Vlad Kayushkin","email":"","disabled_at":0,"groups":[{"id":"principal_000006","kind":"group"},{"id":"principal_000007","kind":"group"}]}`))
+			w.Write([]byte(`{"id":"principal_000001","seq":1,"kind":"human","display_name":"Slava Kayushkin","email":"","disabled_at":0,"groups":[{"id":"principal_000006","kind":"group"},{"id":"principal_000007","kind":"group"}]}`))
 		case "/principals/principal_000006":
 			w.Write([]byte(`{"id":"principal_000006","seq":6,"kind":"group","display_name":"Data Team","disabled_at":0,"members":[{"id":"principal_000001"}]}`))
 		case "/principals/principal_000005":
@@ -42,12 +42,12 @@ func TestHTTPDirectoryReadsAPrincipalAndItsGroups(t *testing.T) {
 	directory := NewHTTPPrincipalDirectory(srv.URL + "/")
 	ctx := context.Background()
 
-	vlad, err := directory.LookupPrincipal(ctx, "principal_000001")
+	slava, err := directory.LookupPrincipal(ctx, "principal_000001")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if vlad.Kind != "human" || strings.Join(vlad.GroupIDs, ",") != "principal_000006,principal_000007" {
-		t.Fatalf("vlad = %+v", vlad)
+	if slava.Kind != "human" || strings.Join(slava.GroupIDs, ",") != "principal_000006,principal_000007" {
+		t.Fatalf("slava = %+v", slava)
 	}
 	group, err := directory.LookupPrincipal(ctx, "principal_000006")
 	if err != nil || group.Kind != "group" || len(group.GroupIDs) != 0 {

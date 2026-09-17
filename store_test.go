@@ -144,7 +144,7 @@ func TestCreateRefusesWhatItCannotStoreBeforeAskingAnyone(t *testing.T) {
 		{"slug for an agent", GrantRequest{PrincipalID: "principal_000001", Relation: "can_run_as", ResourceType: "agent", ResourceID: "claxon"}, "slug is not accepted"},
 		{"leading zero", GrantRequest{PrincipalID: "principal_000001", Relation: "can_use", ResourceType: "tool", ResourceID: "013"}, "plain decimal integer"},
 		{"empty principal", GrantRequest{Relation: "can_use", ResourceType: "tool", ResourceID: "1"}, "principal_id is required"},
-		{"principal by name", GrantRequest{PrincipalID: "Vlad Kayushkin", Relation: "can_use", ResourceType: "tool", ResourceID: "1"}, "not a principal-store id"},
+		{"principal by name", GrantRequest{PrincipalID: "Slava Kayushkin", Relation: "can_use", ResourceType: "tool", ResourceID: "1"}, "not a principal-store id"},
 		{"principal with whitespace", GrantRequest{PrincipalID: " principal_000001", Relation: "can_use", ResourceType: "tool", ResourceID: "1"}, "surrounding whitespace"},
 	}
 	for _, c := range cases {
@@ -285,7 +285,7 @@ func TestEffectiveInheritsActiveGroupsFromTheDirectoryOnEveryCall(t *testing.T) 
 	own := mustGrant(t, s, "principal_000001", RelationCanUse, ResourceTypeTool, "13")
 	viaGroup := mustGrant(t, s, "principal_000006", RelationCanUse, ResourceTypeTool, "14")
 	bothWays := mustGrant(t, s, "principal_000006", RelationCanUse, ResourceTypeTool, "13")
-	mustGrant(t, s, "principal_000007", RelationCanUse, ResourceTypeTool, "15") // a group Vlad is not in
+	mustGrant(t, s, "principal_000007", RelationCanUse, ResourceTypeTool, "15") // a group Slava is not in
 	mustGrant(t, s, "principal_000002", RelationCanRunAs, ResourceTypeAgent, "65")
 	revoked := mustGrant(t, s, "principal_000006", RelationCanRunAs, ResourceTypeAgent, "65")
 	if _, err := s.Revoke(revoked.ID); err != nil {
@@ -322,7 +322,7 @@ func TestEffectiveInheritsActiveGroupsFromTheDirectoryOnEveryCall(t *testing.T) 
 		t.Fatalf("group's own set: %d", len(group))
 	}
 
-	// The membership is read live: drop Vlad from the group and the
+	// The membership is read live: drop Slava from the group and the
 	// inherited rows vanish without this store being told.
 	directory.principals["principal_000001"] = &PrincipalSummary{ID: "principal_000001", Kind: "human"}
 	after, _ := s.Effective(ctx, directory, "principal_000001", "", "")

@@ -33,6 +33,7 @@ func newFakeDirectory() *fakeDirectory {
 	return &fakeDirectory{principals: map[string]*PrincipalSummary{
 		"principal_000001": {ID: "principal_000001", Kind: "human", GroupIDs: []string{"principal_000006"}},
 		"principal_000002": {ID: "principal_000002", Kind: "human"},
+		"principal_000008": {ID: "principal_000008", Kind: "human", IsAdministrator: true},
 		"principal_000006": {ID: "principal_000006", Kind: "group"},
 		"principal_000007": {ID: "principal_000007", Kind: "group"},
 	}}

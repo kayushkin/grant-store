@@ -17,20 +17,20 @@ import (
 //
 // directory is principal-store and checker is the resource owners. Both are
 // required: a nil one panics here, at boot, rather than at the first POST.
-func RegisterHandlers(mux *http.ServeMux, s *Store, directory PrincipalDirectory, checker ResourceChecker) {
-	registerHandlers(mux, s, directory, checker, nil)
-}
-
-// registerHandlers mounts the routes; enforcement nil means every caller is
-// unrestricted. See principal_enforcement.go.
-func registerHandlers(mux *http.ServeMux, s *Store, directory PrincipalDirectory, checker ResourceChecker, enforcement *PrincipalEnforcement) {
+// Every route is gated; see principal_enforcement.go for who may call what.
+// A service token shorter than 32 characters panics here, at boot, rather than
+// leaving a store that believes it is checking callers and is not.
+func RegisterHandlers(mux *http.ServeMux, s *Store, directory PrincipalDirectory, checker ResourceChecker, enforcement PrincipalEnforcement) {
+	if len(enforcement.ServiceToken) < 32 {
+		panic("grant-store: needs a service token of at least 32 characters, or every request that omits the header would be unrestricted")
+	}
 	if directory == nil {
 		panic("grant-store: RegisterHandlers needs a PrincipalDirectory; without one a grant's principal cannot be checked against principal-store")
 	}
 	if checker == nil {
 		panic("grant-store: RegisterHandlers needs a ResourceChecker; without one a grant's resource cannot be checked against its owner")
 	}
-	h := &handler{s: s, directory: directory, checker: checker, enforcement: enforcement}
+	h := &handler{s: s, directory: directory, checker: checker, enforcement: &enforcement}
 	mux.HandleFunc("GET /health", h.health)
 	mux.HandleFunc("GET /relations", h.relations)
 	mux.HandleFunc("GET /resource-types", h.resourceTypes)

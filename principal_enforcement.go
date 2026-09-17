@@ -8,10 +8,10 @@ import (
 	"regexp"
 )
 
-// Principal enforcement: who may read and change grants.
+// Who may read and change grants.
 //
-// Off unless RegisterHandlersWithPrincipalEnforcement is used. With it on,
-// every route except /health, /relations and /resource-types needs one of:
+// There is no off switch: every route except /health, /relations and
+// /resource-types needs one of:
 //
 //   - X-Grant-Store-Service-Token matching the configured token: an internal
 //     service (llm-bridge-server reading a session's grants at spawn,
@@ -21,7 +21,10 @@ import (
 //     sent. The principal must be a human principal-store knows and has not
 //     disabled.
 //
-// Neither is 401. A principal may:
+// Neither is 401. An **administrator** — principal-store's is_administrator on
+// a human — is unrestricted, like the service token: administering the
+// deployment includes handing out and taking back access to it. Any other
+// principal may:
 //
 //   - create or revoke a board grant only on a board it holds can_administer on,
 //     directly or through a group. Every other resource type — tools, skills,
@@ -41,7 +44,7 @@ const (
 	ServiceTokenHeader = "X-Grant-Store-Service-Token"
 )
 
-// PrincipalEnforcement configures RegisterHandlersWithPrincipalEnforcement.
+// PrincipalEnforcement configures RegisterHandlers.
 type PrincipalEnforcement struct {
 	// ServiceToken must be at least 32 characters; an empty one would match
 	// every request that leaves the header out.
@@ -50,17 +53,8 @@ type PrincipalEnforcement struct {
 
 var principalIDShape = regexp.MustCompile(`^principal_\d{6,}$`)
 
-// RegisterHandlersWithPrincipalEnforcement is RegisterHandlers with the rules
-// above applied to every route. It panics on a short service token, at boot.
-func RegisterHandlersWithPrincipalEnforcement(mux *http.ServeMux, s *Store, directory PrincipalDirectory, checker ResourceChecker, enforcement PrincipalEnforcement) {
-	if len(enforcement.ServiceToken) < 32 {
-		panic("grant-store: principal enforcement needs a service token of at least 32 characters")
-	}
-	registerHandlers(mux, s, directory, checker, &enforcement)
-}
-
-// grantCaller is who a request acts as. unrestricted is the service token, or
-// enforcement being off.
+// grantCaller is who a request acts as. unrestricted is the service token or an
+// administrator.
 type grantCaller struct {
 	unrestricted bool
 	principalID  string
@@ -69,9 +63,6 @@ type grantCaller struct {
 // identifyCaller answers the request itself (401 or 502) and returns false
 // when the caller cannot be established.
 func (h *handler) identifyCaller(w http.ResponseWriter, r *http.Request) (grantCaller, bool) {
-	if h.enforcement == nil {
-		return grantCaller{unrestricted: true}, true
-	}
 	if token := r.Header.Get(ServiceTokenHeader); token != "" {
 		if subtle.ConstantTimeCompare([]byte(token), []byte(h.enforcement.ServiceToken)) != 1 {
 			writeErr(w, http.StatusUnauthorized, ServiceTokenHeader+" does not match this store's service token")
@@ -101,7 +92,9 @@ func (h *handler) identifyCaller(w http.ResponseWriter, r *http.Request) (grantC
 		writeErr(w, http.StatusUnauthorized, fmt.Sprintf("%s %s is not an active human principal, and only a person acts", PrincipalIDHeader, principalID))
 		return grantCaller{}, false
 	}
-	return grantCaller{principalID: principalID}, true
+	// An administrator is past every rule below, and is still named in the
+	// returned caller so a log or a future audit row says who acted.
+	return grantCaller{unrestricted: summary.IsAdministrator, principalID: principalID}, true
 }
 
 // callerAdministersBoard reads the caller's effective can_administer grants,

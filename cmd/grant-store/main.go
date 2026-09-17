@@ -45,20 +45,12 @@ func main() {
 		principalStoreURL, llmBridgeServerURL, skillStoreURL, toolStoreURL, kanbanStoreURL, kanbanStoreServiceToken != "")
 
 	mux := http.NewServeMux()
-	switch enforcement := os.Getenv("GRANT_STORE_PRINCIPAL_ENFORCEMENT"); enforcement {
-	case "":
-		grantstore.RegisterHandlers(mux, store, directory, checker)
-		log.Printf("principal enforcement: off; every caller may read and write every grant")
-	case "required":
-		serviceToken := os.Getenv("GRANT_STORE_SERVICE_TOKEN")
-		if len(serviceToken) < 32 {
-			log.Fatal("GRANT_STORE_PRINCIPAL_ENFORCEMENT=required needs GRANT_STORE_SERVICE_TOKEN of at least 32 characters")
-		}
-		grantstore.RegisterHandlersWithPrincipalEnforcement(mux, store, directory, checker, grantstore.PrincipalEnforcement{ServiceToken: serviceToken})
-		log.Printf("principal enforcement: on; requests need X-Principal-Id or the service token")
-	default:
-		log.Fatalf("GRANT_STORE_PRINCIPAL_ENFORCEMENT=%q: leave it unset for no enforcement or set it to \"required\"", enforcement)
+	serviceToken := os.Getenv("GRANT_STORE_SERVICE_TOKEN")
+	if len(serviceToken) < 32 {
+		log.Fatal("GRANT_STORE_SERVICE_TOKEN must be at least 32 characters: it is what an internal service presents, and without it every request that omits the header would be unrestricted")
 	}
+	grantstore.RegisterHandlers(mux, store, directory, checker, grantstore.PrincipalEnforcement{ServiceToken: serviceToken})
+	log.Printf("every request needs X-Principal-Id (set by the gateway from a login) or the service token; an administrator is unrestricted")
 
 	srv := &http.Server{
 		Addr:              addr,

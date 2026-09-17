@@ -206,11 +206,12 @@ every owner answers a missing record with its own text.
 
 ---
 
-## Principal enforcement
+## Who may read and change grants
 
-Off unless `GRANT_STORE_PRINCIPAL_ENFORCEMENT=required`, which also needs
-`GRANT_STORE_SERVICE_TOKEN` (at least 32 characters; no default). With it on,
-every route except `/health`, `/relations` and `/resource-types` needs either:
+There is no off switch. `GRANT_STORE_SERVICE_TOKEN` (at least 32 characters) is
+**required at startup**; without it the store refuses to start rather than run
+open. Every route except `/health`, `/relations` and `/resource-types` needs
+either:
 
 - `X-Grant-Store-Service-Token` — an internal service or an operator;
   unrestricted. llm-bridge-server's spawn-time read and kanban-store's
@@ -232,3 +233,8 @@ principal-store that cannot be asked is **502**.
 
 A board administrator may grant `can_administer` to others: handing a board over
 is part of administering it.
+
+**An administrator** — principal-store's `is_administrator` on a human — is
+unrestricted here, like the service token: reads and writes every grant on
+every resource, whoever holds it. Administering the deployment includes handing
+out and taking back access to it.

@@ -19,7 +19,7 @@ func newTestServerWith(t *testing.T, directory PrincipalDirectory, checker Resou
 	t.Helper()
 	s := newTestStore(t)
 	mux := http.NewServeMux()
-	RegisterHandlers(mux, s, directory, checker)
+	RegisterHandlers(mux, s, directory, checker, PrincipalEnforcement{ServiceToken: enforcementTestServiceToken})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 	return srv
@@ -42,6 +42,10 @@ func do(t *testing.T, srv *httptest.Server, method, path string, body any) (int,
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
+	// Every route is gated, so the plain helper acts as an internal service.
+	// The per-principal rules have their own helper in
+	// principal_enforcement_test.go.
+	req.Header.Set(ServiceTokenHeader, enforcementTestServiceToken)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("do: %v", err)
@@ -223,7 +227,8 @@ func TestRegisterHandlersRefusesANilOwner(t *testing.T) {
 					t.Fatalf("%s: RegisterHandlers did not panic", c.name)
 				}
 			}()
-			RegisterHandlers(http.NewServeMux(), newTestStore(t), c.directory, c.checker)
+			RegisterHandlers(http.NewServeMux(), newTestStore(t), c.directory, c.checker,
+				PrincipalEnforcement{ServiceToken: enforcementTestServiceToken})
 		}()
 	}
 }

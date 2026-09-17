@@ -22,7 +22,7 @@ const (
 func newEnforcingTestServer(t *testing.T) *httptest.Server {
 	t.Helper()
 	mux := http.NewServeMux()
-	RegisterHandlersWithPrincipalEnforcement(mux, newTestStore(t), newFakeDirectory(), &fakeResourceChecker{},
+	RegisterHandlers(mux, newTestStore(t), newFakeDirectory(), &fakeResourceChecker{},
 		PrincipalEnforcement{ServiceToken: enforcementTestServiceToken})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
@@ -136,4 +136,43 @@ func TestPrincipalGrantsOnlyOnBoardsItAdministers(t *testing.T) {
 	expectStatus(t, 200, status, body, "administrator revokes")
 	status, body = doWithHeaders(t, srv, asGrantStorePrincipal(plainMember), "POST", "/grants/"+groupAdministration.ID+"/revoke", nil)
 	expectStatus(t, 404, status, body, "member revokes a grant it cannot read")
+}
+
+// principal_000008 in the fake directory carries is_administrator.
+const deploymentAdministrator = "principal_000008"
+
+// TestAnAdministratorIsPastEveryRule pins the one fact that lets a person reach
+// a grant nobody gave them: administering the deployment includes handing out
+// and taking back access to it.
+func TestAnAdministratorIsPastEveryRule(t *testing.T) {
+	srv := newEnforcingTestServer(t)
+	status, body := doWithHeaders(t, srv, asGrantStorePrincipal(deploymentAdministrator), "POST", "/grants",
+		boardGrantBody(plainMember, "can_view", "board-nobody-granted-them"))
+	expectStatus(t, 201, status, body, "an administrator grants on a board it was never granted")
+	var granted Grant
+	json.Unmarshal(body, &granted)
+
+	status, body = doWithHeaders(t, srv, asGrantStorePrincipal(deploymentAdministrator), "GET", "/grants", nil)
+	expectStatus(t, 200, status, body, "an administrator lists every grant")
+	status, body = doWithHeaders(t, srv, asGrantStorePrincipal(deploymentAdministrator), "GET", "/principals/"+plainMember+"/effective", nil)
+	expectStatus(t, 200, status, body, "an administrator reads someone else's effective grants")
+	status, body = doWithHeaders(t, srv, asGrantStorePrincipal(deploymentAdministrator), "POST", "/grants/"+granted.ID+"/revoke", nil)
+	expectStatus(t, 200, status, body, "an administrator revokes")
+
+	// And a principal who is not an administrator is refused the same calls.
+	status, body = doWithHeaders(t, srv, asGrantStorePrincipal(plainMember), "GET", "/principals/"+deploymentAdministrator+"/effective", nil)
+	expectStatus(t, 403, status, body, "a plain principal reads an administrator's effective grants")
+}
+
+// TestAShortServiceTokenRefusesToRegister pins the boot-time refusal: an empty
+// token would match every request that leaves the header out, so the store
+// must not start rather than run open while its log says it is checking.
+func TestAShortServiceTokenRefusesToRegister(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("RegisterHandlers accepted a short service token")
+		}
+	}()
+	RegisterHandlers(http.NewServeMux(), newTestStore(t), newFakeDirectory(), &fakeResourceChecker{},
+		PrincipalEnforcement{ServiceToken: "too-short"})
 }

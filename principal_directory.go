@@ -28,6 +28,10 @@ type PrincipalSummary struct {
 	ID         string
 	Kind       string // "human" | "group", as principal-store spells them
 	DisabledAt int64
+	// IsAdministrator is principal-store's one fact about a person that this
+	// store acts on: an administrator may read and write every grant, whatever
+	// it is on and whoever holds it.
+	IsAdministrator bool
 	// GroupIDs is the active groups a human belongs to, as principal-store's
 	// GET /principals/{id} expands them. Empty for a group: groups do not nest.
 	GroupIDs []string
@@ -76,10 +80,11 @@ func (d *HTTPPrincipalDirectory) LookupPrincipal(ctx context.Context, principalI
 	}
 	defer response.Body.Close()
 	var body struct {
-		ID         string `json:"id"`
-		Kind       string `json:"kind"`
-		DisabledAt int64  `json:"disabled_at"`
-		Groups     []struct {
+		ID              string `json:"id"`
+		Kind            string `json:"kind"`
+		DisabledAt      int64  `json:"disabled_at"`
+		IsAdministrator bool   `json:"is_administrator"`
+		Groups          []struct {
 			ID string `json:"id"`
 		} `json:"groups"`
 		Error string `json:"error"`
@@ -102,7 +107,7 @@ func (d *HTTPPrincipalDirectory) LookupPrincipal(ctx context.Context, principalI
 	case body.ID != principalID:
 		return nil, fmt.Errorf("%s answered GET %s with principal %q, not %q", principalStoreOwnerName, requestURL, body.ID, principalID)
 	}
-	summary := &PrincipalSummary{ID: body.ID, Kind: body.Kind, DisabledAt: body.DisabledAt}
+	summary := &PrincipalSummary{ID: body.ID, Kind: body.Kind, DisabledAt: body.DisabledAt, IsAdministrator: body.IsAdministrator}
 	for _, group := range body.Groups {
 		summary.GroupIDs = append(summary.GroupIDs, group.ID)
 	}

@@ -56,8 +56,21 @@ ADDR="${GRANT_STORE_ADDR:-127.0.0.1:8315}"
 BASE="http://${ADDR}"
 curl -sfS "$BASE/health" >/dev/null || { echo "ERROR: /health did not answer"; exit 1; }
 curl -sfS "$BASE/relations" | grep -q '"can_use"' || { echo "ERROR: /relations did not list can_use"; exit 1; }
-curl -sfS "$BASE/grants" >/dev/null || { echo "ERROR: /grants did not answer"; exit 1; }
-echo "    /health, /relations and /grants answered"
+# /grants is gated, so the smoke check presents the service token the unit
+# carries — reading it the same way the unit does, from the host-local file, so
+# the check exercises the real credential rather than a copy of it.
+TOKEN_FILE="${GRANT_STORE_TOKEN_FILE:-$HOME/.config/principal-gating-tokens.env}"
+SERVICE_TOKEN="${GRANT_STORE_SERVICE_TOKEN:-}"
+if [ -z "$SERVICE_TOKEN" ] && [ -r "$TOKEN_FILE" ]; then
+  SERVICE_TOKEN="$(sed -n 's/^GRANT_STORE_SERVICE_TOKEN=//p' "$TOKEN_FILE" | head -1)"
+fi
+if [ -z "$SERVICE_TOKEN" ]; then
+  echo "ERROR: no GRANT_STORE_SERVICE_TOKEN to smoke-check with (looked in the environment and $TOKEN_FILE)"
+  exit 1
+fi
+curl -sfS -H "X-Grant-Store-Service-Token: $SERVICE_TOKEN" "$BASE/grants" >/dev/null || { echo "ERROR: /grants did not answer the service token"; exit 1; }
+curl -s -o /dev/null -w '%{http_code}' "$BASE/grants" | grep -q '^401$' || { echo "ERROR: /grants answered an unauthenticated call with something other than 401"; exit 1; }
+echo "    /health and /relations answered; /grants answered the service token and 401'd without it"
 
 # The bind is part of the contract: this service has no auth and must not be
 # reachable off-host. Fail the deploy if it is listening anywhere else.

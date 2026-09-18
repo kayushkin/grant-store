@@ -62,13 +62,22 @@ func (s *Store) Create(ctx context.Context, directory PrincipalDirectory, checke
 	if err := validatePrincipalID(request.PrincipalID); err != nil {
 		return nil, false, err
 	}
-	if _, err := directory.LookupPrincipal(ctx, request.PrincipalID); err != nil {
+	summary, err := directory.LookupPrincipal(ctx, request.PrincipalID)
+	if err != nil {
 		if errors.Is(err, ErrPrincipalNotFound) {
 			return nil, false, fmt.Errorf("%w: principal %s does not exist in principal-store",
 				ErrInvalidGrant, request.PrincipalID)
 		}
 		return nil, false, fmt.Errorf("%w: could not confirm principal %s exists in principal-store, so nothing was written: %v",
 			ErrOwnerUnavailable, request.PrincipalID, err)
+	}
+	// A contact is the outside person a ticket came from — a requester, not
+	// someone this deployment gives anything to. Granting one anything would
+	// hand a customer a tool, an agent or a board, so it is refused here
+	// rather than left to whoever reads the grant later.
+	if !principalKindActsInThisDeployment(summary.Kind) {
+		return nil, false, fmt.Errorf("%w: principal %s is a %s, and a %s holds no grants — it is the outside party on a ticket, not someone this deployment gives access to",
+			ErrInvalidGrant, request.PrincipalID, summary.Kind, summary.Kind)
 	}
 	if err := checker.CheckResourceExists(ctx, definition.name, request.ResourceID); err != nil {
 		if errors.Is(err, ErrResourceNotFound) {

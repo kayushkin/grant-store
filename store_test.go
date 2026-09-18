@@ -34,6 +34,7 @@ func newFakeDirectory() *fakeDirectory {
 		"principal_000001": {ID: "principal_000001", Kind: "human", GroupIDs: []string{"principal_000006"}},
 		"principal_000002": {ID: "principal_000002", Kind: "human"},
 		"principal_000008": {ID: "principal_000008", Kind: "human", IsAdministrator: true},
+		"principal_000010": {ID: "principal_000010", Kind: "contact"},
 		"principal_000006": {ID: "principal_000006", Kind: "group"},
 		"principal_000007": {ID: "principal_000007", Kind: "group"},
 	}}
@@ -381,5 +382,27 @@ func TestEveryRelationNamesOnlyKnownResourceTypes(t *testing.T) {
 				t.Fatalf("%s names %q, which resource_type.go does not define: %v", relation.Name, resourceType, err)
 			}
 		}
+	}
+}
+
+// TestAContactHoldsNoGrants pins the boundary the contact kind exists for: a
+// requester is the outside party on a ticket, so granting one a tool, an agent
+// or a board is refused at the write rather than discovered later.
+func TestAContactHoldsNoGrants(t *testing.T) {
+	s := newTestStore(t)
+	_, _, err := s.Create(context.Background(), newFakeDirectory(), &fakeResourceChecker{}, GrantRequest{
+		PrincipalID: "principal_000010", Relation: RelationCanUse, ResourceType: ResourceTypeTool, ResourceID: "13",
+	})
+	if !errors.Is(err, ErrInvalidGrant) {
+		t.Fatalf("a contact must be refused a grant, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "contact") {
+		t.Fatalf("the refusal should name the kind: %v", err)
+	}
+	// A human is still granted, so the guard refuses contacts and nothing else.
+	if _, _, err := s.Create(context.Background(), newFakeDirectory(), &fakeResourceChecker{}, GrantRequest{
+		PrincipalID: "principal_000002", Relation: RelationCanUse, ResourceType: ResourceTypeTool, ResourceID: "13",
+	}); err != nil {
+		t.Fatalf("a human must still be granted: %v", err)
 	}
 }

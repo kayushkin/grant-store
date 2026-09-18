@@ -26,7 +26,7 @@ type PrincipalDirectory interface {
 // PrincipalSummary is the part of a principal-store row this store reads.
 type PrincipalSummary struct {
 	ID         string
-	Kind       string // "human" | "group", as principal-store spells them
+	Kind       string // "human" | "group" | "contact", as principal-store spells them
 	DisabledAt int64
 	// IsAdministrator is principal-store's one fact about a person that this
 	// store acts on: an administrator may read and write every grant, whatever
@@ -113,3 +113,18 @@ func (d *HTTPPrincipalDirectory) LookupPrincipal(ctx context.Context, principalI
 	}
 	return summary, nil
 }
+
+// principalKindActsInThisDeployment says whether a principal of this kind can
+// hold a grant at all. principal-store's own ActsInThisDeployment is the same
+// rule; it is restated here rather than imported because this store depends on
+// principal-store over HTTP and not as a package, and a kind it has never
+// heard of is refused rather than quietly allowed.
+func principalKindActsInThisDeployment(kind string) bool {
+	return kind == principalKindHuman || kind == principalKindGroup
+}
+
+// The kinds this store acts on, as principal-store spells them.
+const (
+	principalKindHuman = "human"
+	principalKindGroup = "group"
+)

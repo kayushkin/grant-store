@@ -36,7 +36,7 @@ No build tag is needed: there is no full-text index here.
 |---|---|
 | `id` | `grant_000001`. What a session's audit points at |
 | `seq` | monotonic, assigned here; generates `id` |
-| `principal_id` | a principal-store id, human **or group**. Checked with principal-store on write; **not a foreign key** — it is another database's id |
+| `principal_id` | a principal-store id, human **or group**. Checked with principal-store on write; **not a foreign key** — it is another database's id | A **contact** is refused: it is the outside party on a ticket, not someone this deployment grants anything to.
 | `relation` | one of `GET /relations`; enforced in Go against `relation.go` |
 | `resource_type` | one of `GET /resource-types`; enforced in Go against `resource_type.go`, and must be a type the relation allows |
 | `resource_id` | the owner's id as text. Checked with the owner on write; not a foreign key |

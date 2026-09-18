@@ -277,3 +277,24 @@ func (s *Store) queryGrants(query string, args ...any) ([]*Grant, error) {
 	}
 	return out, rows.Err()
 }
+
+// Grant is one relationship tuple.
+type Grant struct {
+	ID           string `json:"id"`
+	Seq          int64  `json:"seq"`
+	PrincipalID  string `json:"principal_id"`
+	Relation     string `json:"relation"`
+	ResourceType string `json:"resource_type"`
+	ResourceID   string `json:"resource_id"`
+	Note         string `json:"note"`
+	GrantedAt    int64  `json:"granted_at"`
+	RevokedAt    int64  `json:"revoked_at"`
+}
+
+// Counts is the /health summary.
+type Counts struct {
+	Grants     int `json:"grants"`
+	Active     int `json:"active"`
+	Revoked    int `json:"revoked"`
+	Principals int `json:"principals"` // distinct principals holding an active grant
+}

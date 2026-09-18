@@ -40,19 +40,6 @@ var (
 	ErrOwnerUnavailable = errors.New("owner unavailable")
 )
 
-// Grant is one relationship tuple.
-type Grant struct {
-	ID           string `json:"id"`
-	Seq          int64  `json:"seq"`
-	PrincipalID  string `json:"principal_id"`
-	Relation     string `json:"relation"`
-	ResourceType string `json:"resource_type"`
-	ResourceID   string `json:"resource_id"`
-	Note         string `json:"note"`
-	GrantedAt    int64  `json:"granted_at"`
-	RevokedAt    int64  `json:"revoked_at"`
-}
-
 // Active reports whether the grant has not been revoked.
 func (g *Grant) Active() bool { return g.RevokedAt == 0 }
 
@@ -65,14 +52,6 @@ type Filter struct {
 	IncludeRevoked bool
 	Limit          int
 	Offset         int
-}
-
-// Counts is the /health summary.
-type Counts struct {
-	Grants     int `json:"grants"`
-	Active     int `json:"active"`
-	Revoked    int `json:"revoked"`
-	Principals int `json:"principals"` // distinct principals holding an active grant
 }
 
 // Store owns the database.

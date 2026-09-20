@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -25,8 +24,10 @@ type ResourceChecker interface {
 	CheckResourceExists(ctx context.Context, resourceType, resourceID string) error
 }
 
-// Where each owner listens when the environment says nothing. The shipped unit
-// sets all three explicitly; the defaults exist so a bare run on this host works.
+// Where each owner listens when the environment says nothing, and the variable
+// that says otherwise; settings.go declares each pair as one setting. The
+// shipped unit sets them explicitly; the defaults exist so a bare run on this
+// host works.
 // LLM_BRIDGE_URL is the name llm-bridge-adapter and dash already read, and
 // SKILL_STORE_URL and TOOL_STORE_URL are dash's, so one host has one name per
 // owner.
@@ -50,33 +51,6 @@ const (
 	// the two must match.
 	KanbanStoreServiceTokenHeader = "X-Kanban-Store-Service-Token"
 )
-
-// LLMBridgeServerURL is where agents, harness instances and machines are
-// checked, read from LLM_BRIDGE_URL.
-func LLMBridgeServerURL() string {
-	return environmentOr(llmBridgeServerURLVariable, DefaultLLMBridgeServerURL)
-}
-
-// SkillStoreURL is where skills are checked, read from SKILL_STORE_URL.
-func SkillStoreURL() string { return environmentOr(skillStoreURLVariable, DefaultSkillStoreURL) }
-
-// ToolStoreURL is where tools are checked, read from TOOL_STORE_URL.
-func ToolStoreURL() string { return environmentOr(toolStoreURLVariable, DefaultToolStoreURL) }
-
-// KanbanStoreURL is where boards are checked, read from KANBAN_STORE_URL.
-func KanbanStoreURL() string { return environmentOr(kanbanStoreURLVariable, DefaultKanbanStoreURL) }
-
-// KanbanStoreServiceToken is sent on board checks, read from
-// KANBAN_STORE_SERVICE_TOKEN. Empty sends no token, which is right for a
-// kanban-store that does not enforce principals.
-func KanbanStoreServiceToken() string { return os.Getenv(kanbanStoreServiceTokenVariable) }
-
-func environmentOr(variable, fallback string) string {
-	if value := os.Getenv(variable); value != "" {
-		return value
-	}
-	return fallback
-}
 
 // ownerCheckTimeout bounds each owner call. A POST waits on it, and the caller is
 // a person clicking in a picker: an owner that has not answered in three

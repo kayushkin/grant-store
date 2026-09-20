@@ -11,20 +11,20 @@ import (
 	"time"
 
 	grantstore "github.com/kayushkin/grant-store"
+	"github.com/kayushkin/llm-bridge/servicesettings"
 )
 
 func main() {
-	addr := os.Getenv("GRANT_STORE_ADDR")
-	if addr == "" {
-		// Loopback, deliberately, like principal-store. This service has no
-		// auth of its own; dash is the front door that adds it. A wildcard bind
-		// would put grant editing on the network for anything that can route
-		// to this host.
-		addr = "127.0.0.1:8315"
+	settings, err := grantstore.NewSettingsRegistry(servicesettings.ProcessEnvironment())
+	if err != nil {
+		log.Fatalf("read settings: %v", err)
 	}
-	dataDir := os.Getenv("GRANT_STORE_DATA_DIR")
+	if err := settings.CheckRequired(); err != nil {
+		log.Fatalf("read settings: %v", err)
+	}
+	addr := settings.String(grantstore.SettingListenAddress)
 
-	store, err := grantstore.Open(dataDir)
+	store, err := grantstore.Open(settings.String(grantstore.SettingDataDirectory))
 	if err != nil {
 		log.Fatalf("open store: %v", err)
 	}
@@ -33,23 +33,25 @@ func main() {
 	// The owners a grant is checked against before it is written: the
 	// principal with principal-store, the resource with whichever store
 	// assigned its id.
-	principalStoreURL := grantstore.PrincipalStoreURL()
-	llmBridgeServerURL := grantstore.LLMBridgeServerURL()
-	skillStoreURL := grantstore.SkillStoreURL()
-	toolStoreURL := grantstore.ToolStoreURL()
-	kanbanStoreURL := grantstore.KanbanStoreURL()
-	kanbanStoreServiceToken := grantstore.KanbanStoreServiceToken()
+	principalStoreURL := settings.String(grantstore.SettingPrincipalStoreURL)
+	llmBridgeServerURL := settings.String(grantstore.SettingLLMBridgeServerURL)
+	skillStoreURL := settings.String(grantstore.SettingSkillStoreURL)
+	toolStoreURL := settings.String(grantstore.SettingToolStoreURL)
+	kanbanStoreURL := settings.String(grantstore.SettingKanbanStoreURL)
+	kanbanStoreServiceToken := settings.String(grantstore.SettingKanbanStoreServiceToken)
 	directory := grantstore.NewHTTPPrincipalDirectory(principalStoreURL)
 	checker := grantstore.NewHTTPResourceChecker(llmBridgeServerURL, skillStoreURL, toolStoreURL, kanbanStoreURL, kanbanStoreServiceToken)
 	log.Printf("owners: principal-store=%s llm-bridge-server=%s skill-store=%s tool-store=%s kanban-store=%s (service token set: %t)",
 		principalStoreURL, llmBridgeServerURL, skillStoreURL, toolStoreURL, kanbanStoreURL, kanbanStoreServiceToken != "")
 
 	mux := http.NewServeMux()
-	serviceToken := os.Getenv("GRANT_STORE_SERVICE_TOKEN")
+	serviceToken := settings.String(grantstore.SettingServiceToken)
 	if len(serviceToken) < 32 {
 		log.Fatal("GRANT_STORE_SERVICE_TOKEN must be at least 32 characters: it is what an internal service presents, and without it every request that omits the header would be unrestricted")
 	}
-	grantstore.RegisterHandlers(mux, store, directory, checker, grantstore.PrincipalEnforcement{ServiceToken: serviceToken})
+	enforcement := grantstore.PrincipalEnforcement{ServiceToken: serviceToken}
+	grantstore.RegisterHandlers(mux, store, directory, checker, enforcement)
+	grantstore.RegisterSettingsHandler(mux, settings, directory, enforcement)
 	log.Printf("every request needs X-Principal-Id (set by the gateway from a login) or the service token; an administrator is unrestricted")
 
 	srv := &http.Server{

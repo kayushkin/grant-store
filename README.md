@@ -37,6 +37,8 @@ Env: `GRANT_STORE_ADDR` (default `127.0.0.1:8315`), `GRANT_STORE_DATA_DIR`
 (default `~/.config/grant-store`), and the owners a grant is checked against:
 `PRINCIPAL_STORE_URL` (`:8314`), `LLM_BRIDGE_URL` (`:8160`), `SKILL_STORE_URL`
 (`:8301`), `TOOL_STORE_URL` (`:8302`). SQLite at `<data dir>/grant-store.db`.
+Every variable the service reads is declared in `settings.go`, and `GET /settings`
+describes them to the service token or an administrator; `CONTRACT.md` has the full list.
 
 **The bind is loopback on purpose.** This service has no auth; dash is the front
 door that adds it at `/api/grants`. `deploy.sh` fails if it finds the port

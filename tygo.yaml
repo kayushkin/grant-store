@@ -12,3 +12,4 @@ packages:
       - "principal_directory.go"
       - "principal_enforcement.go"
       - "resource_checker.go"
+      - "settings.go"

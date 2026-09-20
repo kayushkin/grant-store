@@ -109,6 +109,18 @@ is written); anything else → 500.
 `{"status":"ok","counts":{"grants":N,"active":N,"revoked":N,"principals":N}}` —
 `principals` is distinct principals holding an active grant.
 
+### `GET /settings`
+
+Every environment variable the service reads, declared once in `settings.go`
+with llm-bridge `servicesettings`: `{"service":"grant-store","settings":[{key,
+environment_variable, kind, value_type, description, value, default_value,
+is_set, source, required, editable, notes}], "kinds":[…], "sources":[…]}`. A
+`secret` setting (`GRANT_STORE_SERVICE_TOKEN`, `KANBAN_STORE_SERVICE_TOKEN`)
+carries `is_set` and never a value. **Unrestricted callers only**: the service
+token or an administrator; any other principal is **403**, no caller is 401.
+Nothing is editable and no write route is mounted. A set `GRANT_STORE_` variable
+that is not declared stops the service at startup.
+
 ### `GET /relations`
 
 The table above as JSON: `[{"name","resource_types":[…],"enforced":bool,"description"}]`,

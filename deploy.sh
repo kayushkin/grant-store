@@ -26,6 +26,18 @@ echo "==> Building $BINARY..."
 go build -o "$BINARY" ./cmd/grant-store
 echo "    built: $(ls -lh "$BINARY" | awk '{print $5}')"
 
+# A set GRANT_STORE_ variable that settings.go does not declare, or a missing
+# service token, stops the new binary at boot. Ask before the old one is
+# stopped: build the registry from the running service's own environment. The
+# test prints a verdict, never a value.
+echo "==> Checking the running service's environment against the declared settings..."
+live_pid="$(systemctl --user show -p MainPID --value "$SERVICE")"
+if [ -n "$live_pid" ] && [ "$live_pid" != "0" ]; then
+  go test -count=1 -run '^TestTheLiveProcessEnvironmentBuildsARegistry$' . -args -live-environment-file="/proc/$live_pid/environ"
+else
+  echo "    $SERVICE is not running, so there is no environment to check"
+fi
+
 echo "==> Installing systemd unit..."
 mkdir -p "$(dirname "$UNIT_DEST")"
 cp "$UNIT_SRC" "$UNIT_DEST"
@@ -75,7 +87,9 @@ if [ -z "$SERVICE_TOKEN" ]; then
 fi
 curl -sfS -H "X-Grant-Store-Service-Token: $SERVICE_TOKEN" "$BASE/grants" >/dev/null || { echo "ERROR: /grants did not answer the service token"; exit 1; }
 curl -s -o /dev/null -w '%{http_code}' "$BASE/grants" | grep -q '^401$' || { echo "ERROR: /grants answered an unauthenticated call with something other than 401"; exit 1; }
-echo "    /health and /relations answered; /grants answered the service token and 401'd without it"
+curl -sfS -H "X-Grant-Store-Service-Token: $SERVICE_TOKEN" "$BASE/settings" | grep -q '"service":"grant-store"' || { echo "ERROR: /settings did not describe the service to the service token"; exit 1; }
+curl -s -o /dev/null -w '%{http_code}' "$BASE/settings" | grep -q '^401$' || { echo "ERROR: /settings answered an unauthenticated call with something other than 401"; exit 1; }
+echo "    /health and /relations answered; /grants and /settings answered the service token and 401'd without it"
 
 # The bind is part of the contract: this service has no auth and must not be
 # reachable off-host. Fail the deploy if it is listening anywhere else.

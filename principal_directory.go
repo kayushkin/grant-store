@@ -37,12 +37,8 @@ type PrincipalSummary struct {
 	GroupIDs []string
 }
 
-// PrincipalStoreURL is where principals are checked, read from
-// PRINCIPAL_STORE_URL — the name dash already uses.
-func PrincipalStoreURL() string {
-	return environmentOr(principalStoreURLVariable, DefaultPrincipalStoreURL)
-}
-
+// PRINCIPAL_STORE_URL is the name dash already uses for where principals are
+// checked; settings.go declares it with DefaultPrincipalStoreURL.
 const (
 	DefaultPrincipalStoreURL   = "http://127.0.0.1:8314"
 	principalStoreURLVariable  = "PRINCIPAL_STORE_URL"

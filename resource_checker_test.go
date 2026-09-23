@@ -42,6 +42,8 @@ func newOwnerServer(t *testing.T, agentsBody string, agentsStatus int) *httptest
 		case "/api/boards/board-gone":
 			w.WriteHeader(http.StatusNotFound)
 			w.Write([]byte(`{"error":"not found"}`))
+		case "/operation-types":
+			w.Write([]byte(`[{"type":"classification.run","executor":"keyword-classifier"},{"type":"llm.completion","executor":"harness-oneshot"}]`))
 		case "/machines/m_boom":
 			http.Error(w, "boom", http.StatusInternalServerError)
 		default:
@@ -184,5 +186,16 @@ func TestEveryResourceTypeHasAnOwnerCheck(t *testing.T) {
 		if _, err := lookupResourceType(resourceType); err != nil {
 			t.Fatalf("%s is served but has no definition: %v", resourceType, err)
 		}
+	}
+}
+
+func TestOperationTypeCheckReadsTheBridgesList(t *testing.T) {
+	checker := newCheckerAgainst(newOwnerServer(t, `[]`, http.StatusOK))
+	if err := checker.CheckResourceExists(context.Background(), ResourceTypeOperationType, "llm.completion"); err != nil {
+		t.Fatalf("known type: %v", err)
+	}
+	err := checker.CheckResourceExists(context.Background(), ResourceTypeOperationType, "ticket.action")
+	if !errors.Is(err, ErrResourceNotFound) || !strings.Contains(err.Error(), "classification.run, llm.completion") {
+		t.Fatalf("unknown type: %v", err)
 	}
 }

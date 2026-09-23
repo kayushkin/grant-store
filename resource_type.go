@@ -26,6 +26,11 @@ const (
 	ResourceTypeSkill    = "skill"
 	ResourceTypeTool     = "tool"
 	ResourceTypeBoard    = "board"
+	// ResourceTypeOperationType is a kind of operation llm-bridge-server
+	// runs, such as classification.run. Its id is the type name the bridge
+	// lists at GET /operation-types: the bridge defines the types in code, so
+	// the name is the only id they have.
+	ResourceTypeOperationType = "operation_type"
 )
 
 // resourceTypeDefinition is everything this store knows about one resource
@@ -82,6 +87,11 @@ var resourceTypeDefinitions = []resourceTypeDefinition{
 		name:          ResourceTypeBoard,
 		owner:         "kanban-store",
 		idDescription: "kanban-store's board id, e.g. c9084eb1-be11-48b7-8579-e77c6ffbe8c2",
+	},
+	{
+		name:          ResourceTypeOperationType,
+		owner:         "llm-bridge-server",
+		idDescription: "an operation type as llm-bridge-server's GET /operation-types lists it, e.g. classification.run",
 	},
 }
 

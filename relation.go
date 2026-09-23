@@ -27,13 +27,14 @@ import (
 // a join key, so "Can_Use" is a 400 naming the right spelling, not a rewrite.
 
 const (
-	RelationCanUse        = "can_use"
-	RelationCanRunAs      = "can_run_as"
-	RelationCanDispatchOn = "can_dispatch_on"
-	RelationWorksWith     = "works_with"
-	RelationCanView       = "can_view"
-	RelationCanEdit       = "can_edit"
-	RelationCanAdminister = "can_administer"
+	RelationCanUse          = "can_use"
+	RelationCanRunAs        = "can_run_as"
+	RelationCanDispatchOn   = "can_dispatch_on"
+	RelationWorksWith       = "works_with"
+	RelationCanView         = "can_view"
+	RelationCanEdit         = "can_edit"
+	RelationCanAdminister   = "can_administer"
+	RelationCanRunOperation = "can_run_operation"
 )
 
 // RelationDefinition is everything a caller needs to offer one relation.
@@ -84,6 +85,12 @@ var Relations = []RelationDefinition{
 		ResourceTypes: []string{ResourceTypeBoard},
 		Enforced:      true,
 		Description:   "may change this kanban board's settings, columns, rules and triggers, or delete it, and includes can_edit; kanban-store enforces it",
+	},
+	{
+		Name:          RelationCanRunOperation,
+		ResourceTypes: []string{ResourceTypeOperationType},
+		Enforced:      true,
+		Description:   "may start operations of this type through llm-bridge-server's POST /operations; the bridge's operations.grant_enforcement says whether holding no such grant restricts",
 	},
 	{
 		Name:          RelationWorksWith,

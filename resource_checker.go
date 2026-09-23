@@ -101,6 +101,8 @@ func (c *HTTPResourceChecker) CheckResourceExists(ctx context.Context, resourceT
 	case ResourceTypeBoard:
 		return c.checkByGet(ctx, "kanban-store", kanbanStoreURLVariable,
 			c.kanbanStoreURL+"/api/boards/"+url.PathEscape(resourceID))
+	case ResourceTypeOperationType:
+		return c.checkOperationTypeInList(ctx, resourceID)
 	}
 	// Unreachable through the store, which validates the type first. Reaching it
 	// means a type was added to resource_type.go without an owner check here.
@@ -190,4 +192,32 @@ func (c *HTTPResourceChecker) checkAgentInList(ctx context.Context, resourceID s
 	}
 	return fmt.Errorf("%w: %s answered GET %s with %d agents and none has id %s",
 		ErrResourceNotFound, owner, requestURL, len(agents), resourceID)
+}
+
+// checkOperationTypeInList looks for the type in llm-bridge-server's
+// GET /operation-types, which the bridge serves without a credential.
+func (c *HTTPResourceChecker) checkOperationTypeInList(ctx context.Context, resourceID string) error {
+	const owner = "llm-bridge-server"
+	requestURL := c.llmBridgeServerURL + "/operation-types"
+	response, body, err := c.get(ctx, owner, requestURL)
+	if err != nil {
+		return err
+	}
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return fmt.Errorf("%s answered GET %s with %s: %s", owner, requestURL, response.Status, strings.TrimSpace(string(body)))
+	}
+	var operationTypes []struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(body, &operationTypes); err != nil {
+		return fmt.Errorf("%s answered GET %s with a body that is not a JSON array of operation types: %w", owner, requestURL, err)
+	}
+	known := make([]string, 0, len(operationTypes))
+	for _, operationType := range operationTypes {
+		if operationType.Type == resourceID {
+			return nil
+		}
+		known = append(known, operationType.Type)
+	}
+	return fmt.Errorf("%w: %s runs no operation type %q; it runs %s", ErrResourceNotFound, owner, resourceID, strings.Join(known, ", "))
 }

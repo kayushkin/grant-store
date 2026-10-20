@@ -21,8 +21,13 @@ const (
 
 func newEnforcingTestServer(t *testing.T) *httptest.Server {
 	t.Helper()
+	return newEnforcingTestServerWith(t, newFakeDirectory())
+}
+
+func newEnforcingTestServerWith(t *testing.T, directory PrincipalDirectory) *httptest.Server {
+	t.Helper()
 	mux := http.NewServeMux()
-	RegisterHandlers(mux, newTestStore(t), newFakeDirectory(), &fakeResourceChecker{},
+	RegisterHandlers(mux, newTestStore(t), directory, &fakeResourceChecker{},
 		PrincipalEnforcement{ServiceToken: enforcementTestServiceToken})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)

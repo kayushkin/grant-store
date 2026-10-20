@@ -26,8 +26,15 @@ type PrincipalDirectory interface {
 // PrincipalSummary is the part of a principal-store row this store reads.
 type PrincipalSummary struct {
 	ID         string
-	Kind       string // "human" | "group" | "contact", as principal-store spells them
+	Kind       string // as principal-store spells it; shown in messages, never compared
 	DisabledAt int64
+	// ActsInThisDeployment and ActsAsCaller are principal-store's answers for
+	// this principal's kind: may it hold grants, and may a request act as it.
+	// This store reads them rather than comparing Kind to a word, so a kind
+	// principal-store adds (a peer, say) is handled by what principal-store
+	// says it may do.
+	ActsInThisDeployment bool
+	ActsAsCaller         bool
 	// IsAdministrator is principal-store's one fact about a person that this
 	// store acts on: an administrator may read and write every grant, whatever
 	// it is on and whoever holds it.
@@ -40,10 +47,9 @@ type PrincipalSummary struct {
 // PRINCIPAL_STORE_URL is the name dash already uses for where principals are
 // checked; settings.go declares it with DefaultPrincipalStoreURL.
 const (
-	DefaultPrincipalStoreURL   = "http://127.0.0.1:8314"
-	principalStoreURLVariable  = "PRINCIPAL_STORE_URL"
-	principalStoreOwnerName    = "principal-store"
-	principalStoreKindHumanTag = "human"
+	DefaultPrincipalStoreURL  = "http://127.0.0.1:8314"
+	principalStoreURLVariable = "PRINCIPAL_STORE_URL"
+	principalStoreOwnerName   = "principal-store"
 )
 
 // HTTPPrincipalDirectory reads the real principal-store over HTTP.
@@ -80,7 +86,11 @@ func (d *HTTPPrincipalDirectory) LookupPrincipal(ctx context.Context, principalI
 		Kind            string `json:"kind"`
 		DisabledAt      int64  `json:"disabled_at"`
 		IsAdministrator bool   `json:"is_administrator"`
-		Groups          []struct {
+		// Pointers, so a principal-store that predates these answers is an
+		// error naming that, not a principal that silently may do nothing.
+		ActsInThisDeployment *bool `json:"acts_in_this_deployment"`
+		ActsAsCaller         *bool `json:"acts_as_caller"`
+		Groups               []struct {
 			ID string `json:"id"`
 		} `json:"groups"`
 		Error string `json:"error"`
@@ -102,25 +112,13 @@ func (d *HTTPPrincipalDirectory) LookupPrincipal(ctx context.Context, principalI
 		return nil, fmt.Errorf("%s answered GET %s with a body that is not a principal: %w", principalStoreOwnerName, requestURL, decodeErr)
 	case body.ID != principalID:
 		return nil, fmt.Errorf("%s answered GET %s with principal %q, not %q", principalStoreOwnerName, requestURL, body.ID, principalID)
+	case body.ActsInThisDeployment == nil || body.ActsAsCaller == nil:
+		return nil, fmt.Errorf("%s answered GET %s without acts_in_this_deployment and acts_as_caller, so it is older than this store needs: deploy principal-store first", principalStoreOwnerName, requestURL)
 	}
-	summary := &PrincipalSummary{ID: body.ID, Kind: body.Kind, DisabledAt: body.DisabledAt, IsAdministrator: body.IsAdministrator}
+	summary := &PrincipalSummary{ID: body.ID, Kind: body.Kind, DisabledAt: body.DisabledAt, IsAdministrator: body.IsAdministrator,
+		ActsInThisDeployment: *body.ActsInThisDeployment, ActsAsCaller: *body.ActsAsCaller}
 	for _, group := range body.Groups {
 		summary.GroupIDs = append(summary.GroupIDs, group.ID)
 	}
 	return summary, nil
 }
-
-// principalKindActsInThisDeployment says whether a principal of this kind can
-// hold a grant at all. principal-store's own ActsInThisDeployment is the same
-// rule; it is restated here rather than imported because this store depends on
-// principal-store over HTTP and not as a package, and a kind it has never
-// heard of is refused rather than quietly allowed.
-func principalKindActsInThisDeployment(kind string) bool {
-	return kind == principalKindHuman || kind == principalKindGroup
-}
-
-// The kinds this store acts on, as principal-store spells them.
-const (
-	principalKindHuman = "human"
-	principalKindGroup = "group"
-)

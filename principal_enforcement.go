@@ -88,8 +88,8 @@ func (h *handler) identifyCaller(w http.ResponseWriter, r *http.Request) (grantC
 		writeErr(w, http.StatusBadGateway, fmt.Sprintf("could not read %s from principal-store, so the caller is unknown: %v", principalID, err))
 		return grantCaller{}, false
 	}
-	if summary.Kind != "human" || summary.DisabledAt != 0 {
-		writeErr(w, http.StatusUnauthorized, fmt.Sprintf("%s %s is not an active human principal, and only a person acts", PrincipalIDHeader, principalID))
+	if !summary.ActsAsCaller || summary.DisabledAt != 0 {
+		writeErr(w, http.StatusUnauthorized, fmt.Sprintf("%s %s is a %s principal that is disabled or does not act as a caller, by principal-store's answer; only an active human or peer acts", PrincipalIDHeader, principalID, summary.Kind))
 		return grantCaller{}, false
 	}
 	// An administrator is past every rule below, and is still named in the

@@ -18,11 +18,11 @@ func newPrincipalStoreServer(t *testing.T) *httptest.Server {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.EscapedPath() {
 		case "/principals/principal_000001":
-			w.Write([]byte(`{"id":"principal_000001","seq":1,"kind":"human","display_name":"Slava Kayushkin","email":"","disabled_at":0,"groups":[{"id":"principal_000006","kind":"group"},{"id":"principal_000007","kind":"group"}]}`))
+			w.Write([]byte(`{"id":"principal_000001","seq":1,"kind":"human","acts_in_this_deployment":true,"acts_as_caller":true,"display_name":"Slava Kayushkin","email":"","disabled_at":0,"groups":[{"id":"principal_000006","kind":"group"},{"id":"principal_000007","kind":"group"}]}`))
 		case "/principals/principal_000006":
-			w.Write([]byte(`{"id":"principal_000006","seq":6,"kind":"group","display_name":"Data Team","disabled_at":0,"members":[{"id":"principal_000001"}]}`))
+			w.Write([]byte(`{"id":"principal_000006","seq":6,"kind":"group","acts_in_this_deployment":true,"acts_as_caller":false,"display_name":"Data Team","disabled_at":0,"members":[{"id":"principal_000001"}]}`))
 		case "/principals/principal_000005":
-			w.Write([]byte(`{"id":"principal_000005","kind":"human","display_name":"Gone","disabled_at":1789000000,"groups":[]}`))
+			w.Write([]byte(`{"id":"principal_000005","kind":"human","acts_in_this_deployment":true,"acts_as_caller":true,"display_name":"Gone","disabled_at":1789000000,"groups":[]}`))
 		case "/principals/principal_000099":
 			w.WriteHeader(http.StatusNotFound)
 			w.Write([]byte(`{"error":"not found: principal principal_000099"}`))

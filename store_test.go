@@ -31,12 +31,12 @@ type fakeDirectory struct {
 
 func newFakeDirectory() *fakeDirectory {
 	return &fakeDirectory{principals: map[string]*PrincipalSummary{
-		"principal_000001": {ID: "principal_000001", Kind: "human", GroupIDs: []string{"principal_000006"}},
-		"principal_000002": {ID: "principal_000002", Kind: "human"},
-		"principal_000008": {ID: "principal_000008", Kind: "human", IsAdministrator: true},
+		"principal_000001": {ID: "principal_000001", Kind: "human", ActsInThisDeployment: true, ActsAsCaller: true, GroupIDs: []string{"principal_000006"}},
+		"principal_000002": {ID: "principal_000002", Kind: "human", ActsInThisDeployment: true, ActsAsCaller: true},
+		"principal_000008": {ID: "principal_000008", Kind: "human", ActsInThisDeployment: true, ActsAsCaller: true, IsAdministrator: true},
 		"principal_000010": {ID: "principal_000010", Kind: "contact"},
-		"principal_000006": {ID: "principal_000006", Kind: "group"},
-		"principal_000007": {ID: "principal_000007", Kind: "group"},
+		"principal_000006": {ID: "principal_000006", Kind: "group", ActsInThisDeployment: true},
+		"principal_000007": {ID: "principal_000007", Kind: "group", ActsInThisDeployment: true},
 	}}
 }
 
@@ -326,7 +326,7 @@ func TestEffectiveInheritsActiveGroupsFromTheDirectoryOnEveryCall(t *testing.T) 
 
 	// The membership is read live: drop Slava from the group and the
 	// inherited rows vanish without this store being told.
-	directory.principals["principal_000001"] = &PrincipalSummary{ID: "principal_000001", Kind: "human"}
+	directory.principals["principal_000001"] = &PrincipalSummary{ID: "principal_000001", Kind: "human", ActsInThisDeployment: true, ActsAsCaller: true}
 	after, _ := s.Effective(ctx, directory, "principal_000001", "", "")
 	if len(after) != 1 || after[0].ID != own.ID {
 		t.Fatalf("after leaving the group: %+v", after)

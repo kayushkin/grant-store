@@ -23,6 +23,13 @@ import (
 // principal-store used to keep, moved here so there is one place to look —
 // and nothing refuses anything because of it.
 //
+// A grant whose resource_id is AllResources ("*") names every resource of its
+// type, including ones created after the grant. Only a relation whose
+// enforcing service reads "*" accepts it: llm-bridge-server's four. kanban-store
+// does not read it yet, so a board grant of "*" is refused here rather than
+// stored and silently ignored there; works_with is advisory and a list of
+// everything advises nothing.
+//
 // Nothing here is normalised: the relation arrives in a body and is stored as
 // a join key, so "Can_Use" is a 400 naming the right spelling, not a rewrite.
 
@@ -37,66 +44,83 @@ const (
 	RelationCanRunOperation = "can_run_operation"
 )
 
+// AllResources is the resource_id that names every resource of the grant's
+// type, now and later.
+const AllResources = "*"
+
 // RelationDefinition is everything a caller needs to offer one relation.
 type RelationDefinition struct {
 	Name          string   `json:"name"`
 	ResourceTypes []string `json:"resource_types"`
 	// Enforced says llm-bridge-server filters a session's offer by this
 	// relation. False means the relation is a list someone reads, not a lock.
-	Enforced    bool   `json:"enforced"`
-	Description string `json:"description"`
+	Enforced bool `json:"enforced"`
+	// AcceptsAllResources says a grant of this relation may name resource_id
+	// "*", meaning every resource of its type.
+	AcceptsAllResources bool   `json:"accepts_all_resources"`
+	Description         string `json:"description"`
+	// allResourcesRefusal is why a relation refuses "*", for the 400.
+	allResourcesRefusal string
 }
 
 // Relations is every relation a grant can carry, in the order GET /relations
 // serves them.
 var Relations = []RelationDefinition{
 	{
-		Name:          RelationCanUse,
-		ResourceTypes: []string{ResourceTypeTool, ResourceTypeSkill},
-		Enforced:      true,
-		Description:   "may be offered this tool or skill in a session started as this principal",
+		Name:                RelationCanUse,
+		AcceptsAllResources: true,
+		ResourceTypes:       []string{ResourceTypeTool, ResourceTypeSkill},
+		Enforced:            true,
+		Description:         "may be offered this tool or skill in a session started as this principal",
 	},
 	{
-		Name:          RelationCanRunAs,
-		ResourceTypes: []string{ResourceTypeAgent},
-		Enforced:      true,
-		Description:   "may start a session as this agent",
+		Name:                RelationCanRunAs,
+		AcceptsAllResources: true,
+		ResourceTypes:       []string{ResourceTypeAgent},
+		Enforced:            true,
+		Description:         "may start a session as this agent",
 	},
 	{
-		Name:          RelationCanDispatchOn,
-		ResourceTypes: []string{ResourceTypeInstance, ResourceTypeMachine},
-		Enforced:      true,
-		Description:   "may start a session on this harness instance or machine",
+		Name:                RelationCanDispatchOn,
+		AcceptsAllResources: true,
+		ResourceTypes:       []string{ResourceTypeInstance, ResourceTypeMachine},
+		Enforced:            true,
+		Description:         "may start a session on this harness instance or machine",
 	},
 	{
-		Name:          RelationCanView,
-		ResourceTypes: []string{ResourceTypeBoard},
-		Enforced:      true,
-		Description:   "may see this kanban board and its cards; kanban-store enforces it",
+		Name:                RelationCanView,
+		allResourcesRefusal: "kanban-store does not read a board grant of \"*\" yet",
+		ResourceTypes:       []string{ResourceTypeBoard},
+		Enforced:            true,
+		Description:         "may see this kanban board and its cards; kanban-store enforces it",
 	},
 	{
-		Name:          RelationCanEdit,
-		ResourceTypes: []string{ResourceTypeBoard},
-		Enforced:      true,
-		Description:   "may create, move, assign and annotate cards on this kanban board, and includes can_view; kanban-store enforces it",
+		Name:                RelationCanEdit,
+		allResourcesRefusal: "kanban-store does not read a board grant of \"*\" yet",
+		ResourceTypes:       []string{ResourceTypeBoard},
+		Enforced:            true,
+		Description:         "may create, move, assign and annotate cards on this kanban board, and includes can_view; kanban-store enforces it",
 	},
 	{
-		Name:          RelationCanAdminister,
-		ResourceTypes: []string{ResourceTypeBoard},
-		Enforced:      true,
-		Description:   "may change this kanban board's settings, columns, rules and triggers, or delete it, and includes can_edit; kanban-store enforces it",
+		Name:                RelationCanAdminister,
+		allResourcesRefusal: "kanban-store does not read a board grant of \"*\" yet",
+		ResourceTypes:       []string{ResourceTypeBoard},
+		Enforced:            true,
+		Description:         "may change this kanban board's settings, columns, rules and triggers, or delete it, and includes can_edit; kanban-store enforces it",
 	},
 	{
-		Name:          RelationCanRunOperation,
-		ResourceTypes: []string{ResourceTypeOperationType},
-		Enforced:      true,
-		Description:   "may start operations of this type through llm-bridge-server's POST /operations; the bridge's operations.grant_enforcement says whether holding no such grant restricts",
+		Name:                RelationCanRunOperation,
+		AcceptsAllResources: true,
+		ResourceTypes:       []string{ResourceTypeOperationType},
+		Enforced:            true,
+		Description:         "may start operations of this type through llm-bridge-server's POST /operations; the bridge's operations.grant_enforcement says whether holding no such grant restricts",
 	},
 	{
-		Name:          RelationWorksWith,
-		ResourceTypes: []string{ResourceTypeAgent, ResourceTypeInstance, ResourceTypeMachine, ResourceTypeSkill, ResourceTypeTool},
-		Enforced:      false,
-		Description:   "advisory: what this principal usually works with; a card's dispatch picker reads it to put an assignee's instances first, and nothing refuses anything because of it",
+		Name:                RelationWorksWith,
+		allResourcesRefusal: "works_with is advisory, and a list of everything advises nothing",
+		ResourceTypes:       []string{ResourceTypeAgent, ResourceTypeInstance, ResourceTypeMachine, ResourceTypeSkill, ResourceTypeTool},
+		Enforced:            false,
+		Description:         "advisory: what this principal usually works with; a card's dispatch picker reads it to put an assignee's instances first, and nothing refuses anything because of it",
 	},
 }
 

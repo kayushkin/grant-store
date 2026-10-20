@@ -56,8 +56,15 @@ func (s *Store) Create(ctx context.Context, directory PrincipalDirectory, checke
 		return nil, false, fmt.Errorf("%w: relation %s does not apply to a %s: it applies to %s",
 			ErrInvalidGrant, relation.Name, definition.name, strings.Join(relation.ResourceTypes, ", "))
 	}
-	if err := validateResourceID(definition, request.ResourceID); err != nil {
-		return nil, false, err
+	grantsAllResources := request.ResourceID == AllResources
+	if grantsAllResources && !relation.AcceptsAllResources {
+		return nil, false, fmt.Errorf("%w: relation %s does not accept resource_id %q, because %s: name one %s",
+			ErrInvalidGrant, relation.Name, AllResources, relation.allResourcesRefusal, definition.name)
+	}
+	if !grantsAllResources {
+		if err := validateResourceID(definition, request.ResourceID); err != nil {
+			return nil, false, err
+		}
 	}
 	if err := validatePrincipalID(request.PrincipalID); err != nil {
 		return nil, false, err
@@ -74,18 +81,23 @@ func (s *Store) Create(ctx context.Context, directory PrincipalDirectory, checke
 	// A contact is the outside person a ticket came from — a requester, not
 	// someone this deployment gives anything to. Granting one anything would
 	// hand a customer a tool, an agent or a board, so it is refused here
-	// rather than left to whoever reads the grant later.
-	if !principalKindActsInThisDeployment(summary.Kind) {
+	// rather than left to whoever reads the grant later. principal-store says
+	// which kinds hold grants; this store reads its answer.
+	if !summary.ActsInThisDeployment {
 		return nil, false, fmt.Errorf("%w: principal %s is a %s, and a %s holds no grants — it is the outside party on a ticket, not someone this deployment gives access to",
 			ErrInvalidGrant, request.PrincipalID, summary.Kind, summary.Kind)
 	}
-	if err := checker.CheckResourceExists(ctx, definition.name, request.ResourceID); err != nil {
-		if errors.Is(err, ErrResourceNotFound) {
-			return nil, false, fmt.Errorf("%w: %s %s does not exist in %s",
-				ErrInvalidGrant, definition.name, request.ResourceID, definition.owner)
+	// "*" names no row, so there is no owner to ask; it covers whatever the
+	// owner holds now and later.
+	if !grantsAllResources {
+		if err := checker.CheckResourceExists(ctx, definition.name, request.ResourceID); err != nil {
+			if errors.Is(err, ErrResourceNotFound) {
+				return nil, false, fmt.Errorf("%w: %s %s does not exist in %s",
+					ErrInvalidGrant, definition.name, request.ResourceID, definition.owner)
+			}
+			return nil, false, fmt.Errorf("%w: could not confirm %s %s exists in %s, so nothing was written: %v",
+				ErrOwnerUnavailable, definition.name, request.ResourceID, definition.owner, err)
 		}
-		return nil, false, fmt.Errorf("%w: could not confirm %s %s exists in %s, so nothing was written: %v",
-			ErrOwnerUnavailable, definition.name, request.ResourceID, definition.owner, err)
 	}
 
 	tx, err := s.db.BeginTx(ctx, nil)

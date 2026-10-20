@@ -36,10 +36,10 @@ No build tag is needed: there is no full-text index here.
 |---|---|
 | `id` | `grant_000001`. What a session's audit points at |
 | `seq` | monotonic, assigned here; generates `id` |
-| `principal_id` | a principal-store id, human **or group**. Checked with principal-store on write; **not a foreign key** — it is another database's id. A **contact** is refused: it is the outside party on a ticket, not someone this deployment grants anything to |
+| `principal_id` | a principal-store id of a kind principal-store says holds grants (`acts_in_this_deployment`): a human, a **group** or a **peer**. Checked with principal-store on write; **not a foreign key** — it is another database's id. A **contact** is refused: it is the outside party on a ticket, not someone this deployment grants anything to |
 | `relation` | one of `GET /relations`; enforced in Go against `relation.go` |
 | `resource_type` | one of `GET /resource-types`; enforced in Go against `resource_type.go`, and must be a type the relation allows |
-| `resource_id` | the owner's id as text. Checked with the owner on write; not a foreign key |
+| `resource_id` | the owner's id as text. Checked with the owner on write; not a foreign key. **`*`** names every resource of the type, now and later; only a relation with `accepts_all_resources` takes it (`can_use`, `can_run_as`, `can_dispatch_on`, `can_run_operation`, the four llm-bridge-server enforces), and no owner is asked. A board grant of `*` is a 400 because kanban-store does not read it yet, and so is `works_with`, which is advisory |
 | `note` | free text, trimmed: why, for whoever reads the list later |
 | `granted_at` | |
 | `revoked_at` | 0 = active. **The only removal**; see below |
@@ -123,7 +123,7 @@ that is not declared stops the service at startup.
 
 ### `GET /relations`
 
-The table above as JSON: `[{"name","resource_types":[…],"enforced":bool,"description"}]`,
+The table above as JSON: `[{"name","resource_types":[…],"enforced":bool,"accepts_all_resources":bool,"description"}]`,
 in the order shown.
 
 ### `GET /resource-types`
@@ -230,9 +230,10 @@ either:
   per-request board read both send it.
 - `X-Principal-Id` — set by a gateway from a verified login, trusted as sent, so
   users must reach this store only through that gateway. The principal must be
-  an active human in principal-store.
+  active and of a kind principal-store says acts as a caller
+  (`acts_as_caller`): a human or a peer.
 
-Neither, a wrong token, or an unknown, disabled or group principal is **401**.
+Neither, a wrong token, or an unknown, disabled, group or contact principal is **401**.
 principal-store that cannot be asked is **502**.
 
 | Route | A principal may |
@@ -246,7 +247,7 @@ principal-store that cannot be asked is **502**.
 A board administrator may grant `can_administer` to others: handing a board over
 is part of administering it.
 
-**An administrator** — principal-store's `is_administrator` on a human — is
+**An administrator** — principal-store's `is_administrator` on a human or peer — is
 unrestricted here, like the service token: reads and writes every grant on
 every resource, whoever holds it. Administering the deployment includes handing
 out and taking back access to it.

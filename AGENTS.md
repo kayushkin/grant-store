@@ -16,7 +16,7 @@ These sections are stored in agent-store as a project prompt collection and rend
 
 ## A grant on every resource: `*`
 
-A grant whose `resource_id` is `*` names every resource of its type, including ones created later. Only a relation with `accepts_all_resources` takes it — the four llm-bridge-server enforces: `can_use`, `can_run_as`, `can_dispatch_on`, `can_run_operation` — and no owner is asked, because `*` names no row. A board grant of `*` is a 400 until kanban-store reads it, so it is never stored and silently ignored; `works_with` refuses it because a list of everything advises nothing. Added 2026-10-20 for linked bridge servers (design note `d107154a-49ac-471b-a1b7-fc7975de37f3`), so a role such as "may dispatch on any instance" survives adding an instance.
+A grant whose `resource_id` is `*` names every resource of its type, including ones created later. Only a relation with `accepts_all_resources` takes it — the five llm-bridge-server enforces: `can_use`, `can_run_as`, `can_dispatch_on`, `can_run_operation`, `can_observe_sessions_on` — and no owner is asked, because `*` names no row. A board grant of `*` is a 400 until kanban-store reads it, so it is never stored and silently ignored; `works_with` refuses it because a list of everything advises nothing. Added 2026-10-20 for linked bridge servers (design note `d107154a-49ac-471b-a1b7-fc7975de37f3`), so a role such as "may dispatch on any instance" survives adding an instance.
 
 ## Both owners are asked before a write
 

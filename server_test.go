@@ -93,7 +93,7 @@ func TestVocabularyRoutes(t *testing.T) {
 	if err := json.Unmarshal(body, &relations); err != nil {
 		t.Fatal(err)
 	}
-	if len(relations) != 8 || relations[0].Name != "can_use" || !relations[0].Enforced || relations[7].Name != "works_with" || relations[7].Enforced ||
+	if len(relations) != 9 || relations[0].Name != "can_use" || !relations[0].Enforced || relations[8].Name != "works_with" || relations[8].Enforced || relations[7].Name != "can_observe_sessions_on" ||
 		relations[6].Name != "can_run_operation" || relations[6].ResourceTypes[0] != "operation_type" ||
 		relations[3].Name != "can_view" || relations[4].Name != "can_edit" || relations[5].Name != "can_administer" || relations[3].ResourceTypes[0] != "board" {
 		t.Fatalf("relations = %+v", relations)

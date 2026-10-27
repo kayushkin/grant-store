@@ -25,7 +25,7 @@ import (
 //
 // A grant whose resource_id is AllResources ("*") names every resource of its
 // type, including ones created after the grant. Only a relation whose
-// enforcing service reads "*" accepts it: llm-bridge-server's four. kanban-store
+// enforcing service reads "*" accepts it: llm-bridge-server's five. kanban-store
 // does not read it yet, so a board grant of "*" is refused here rather than
 // stored and silently ignored there; works_with is advisory and a list of
 // everything advises nothing.
@@ -42,6 +42,9 @@ const (
 	RelationCanEdit         = "can_edit"
 	RelationCanAdminister   = "can_administer"
 	RelationCanRunOperation = "can_run_operation"
+	// RelationCanObserveSessionsOn lets a principal read sessions it does
+	// not own on an instance or machine, and change nothing.
+	RelationCanObserveSessionsOn = "can_observe_sessions_on"
 )
 
 // AllResources is the resource_id that names every resource of the grant's
@@ -114,6 +117,13 @@ var Relations = []RelationDefinition{
 		ResourceTypes:       []string{ResourceTypeOperationType},
 		Enforced:            true,
 		Description:         "may start operations of this type through llm-bridge-server's POST /operations; the bridge's operations.grant_enforcement says whether holding no such grant restricts",
+	},
+	{
+		Name:                RelationCanObserveSessionsOn,
+		AcceptsAllResources: true,
+		ResourceTypes:       []string{ResourceTypeInstance, ResourceTypeMachine},
+		Enforced:            true,
+		Description:         "may read sessions it did not start on this harness instance or machine, and change none of them; llm-bridge-server reads it on its read-only session routes, and holding none allows nothing",
 	},
 	{
 		Name:                RelationWorksWith,

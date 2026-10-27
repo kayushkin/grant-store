@@ -39,7 +39,7 @@ No build tag is needed: there is no full-text index here.
 | `principal_id` | a principal-store id of a kind principal-store says holds grants (`acts_in_this_deployment`): a human, a **group** or a **peer**. Checked with principal-store on write; **not a foreign key** — it is another database's id. A **contact** is refused: it is the outside party on a ticket, not someone this deployment grants anything to |
 | `relation` | one of `GET /relations`; enforced in Go against `relation.go` |
 | `resource_type` | one of `GET /resource-types`; enforced in Go against `resource_type.go`, and must be a type the relation allows |
-| `resource_id` | the owner's id as text. Checked with the owner on write; not a foreign key. **`*`** names every resource of the type, now and later; only a relation with `accepts_all_resources` takes it (`can_use`, `can_run_as`, `can_dispatch_on`, `can_run_operation`, the four llm-bridge-server enforces), and no owner is asked. A board grant of `*` is a 400 because kanban-store does not read it yet, and so is `works_with`, which is advisory |
+| `resource_id` | the owner's id as text. Checked with the owner on write; not a foreign key. **`*`** names every resource of the type, now and later; only a relation with `accepts_all_resources` takes it (`can_use`, `can_run_as`, `can_dispatch_on`, `can_run_operation`, `can_observe_sessions_on`, the five llm-bridge-server enforces), and no owner is asked. A board grant of `*` is a 400 because kanban-store does not read it yet, and so is `works_with`, which is advisory |
 | `note` | free text, trimmed: why, for whoever reads the list later |
 | `granted_at` | |
 | `revoked_at` | 0 = active. **The only removal**; see below |

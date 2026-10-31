@@ -82,7 +82,7 @@ func decodeGrants(t *testing.T, body []byte) []Grant {
 func TestVocabularyRoutes(t *testing.T) {
 	srv := newTestServer(t)
 	status, body := do(t, srv, "GET", "/resource-types", nil)
-	if status != http.StatusOK || strings.TrimSpace(string(body)) != `["agent","instance","machine","skill","tool","board","operation_type"]` {
+	if status != http.StatusOK || strings.TrimSpace(string(body)) != `["agent","instance","machine","skill","tool","board","operation_type","principal","peer_connection"]` {
 		t.Fatalf("GET /resource-types = %d: %s", status, body)
 	}
 	status, body = do(t, srv, "GET", "/relations", nil)
@@ -93,7 +93,9 @@ func TestVocabularyRoutes(t *testing.T) {
 	if err := json.Unmarshal(body, &relations); err != nil {
 		t.Fatal(err)
 	}
-	if len(relations) != 9 || relations[0].Name != "can_use" || !relations[0].Enforced || relations[8].Name != "works_with" || relations[8].Enforced || relations[7].Name != "can_observe_sessions_on" ||
+	if len(relations) != 11 || relations[0].Name != "can_use" || !relations[0].Enforced || relations[10].Name != "works_with" || relations[10].Enforced || relations[7].Name != "can_observe_sessions_on" ||
+		relations[8].Name != "can_start_sessions_as" || relations[8].AcceptsAllResources || relations[8].ResourceTypes[0] != "principal" ||
+		relations[9].Name != "can_call_through" || !relations[9].AcceptsAllResources || relations[9].ResourceTypes[0] != "peer_connection" ||
 		relations[6].Name != "can_run_operation" || relations[6].ResourceTypes[0] != "operation_type" ||
 		relations[3].Name != "can_view" || relations[4].Name != "can_edit" || relations[5].Name != "can_administer" || relations[3].ResourceTypes[0] != "board" {
 		t.Fatalf("relations = %+v", relations)

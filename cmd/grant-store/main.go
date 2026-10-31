@@ -39,10 +39,19 @@ func main() {
 	toolStoreURL := settings.String(grantstore.SettingToolStoreURL)
 	kanbanStoreURL := settings.String(grantstore.SettingKanbanStoreURL)
 	kanbanStoreServiceToken := settings.String(grantstore.SettingKanbanStoreServiceToken)
+	llmBridgeServiceToken := settings.String(grantstore.SettingLLMBridgeServiceToken)
 	directory := grantstore.NewHTTPPrincipalDirectory(principalStoreURL)
-	checker := grantstore.NewHTTPResourceChecker(llmBridgeServerURL, skillStoreURL, toolStoreURL, kanbanStoreURL, kanbanStoreServiceToken)
-	log.Printf("owners: principal-store=%s llm-bridge-server=%s skill-store=%s tool-store=%s kanban-store=%s (service token set: %t)",
-		principalStoreURL, llmBridgeServerURL, skillStoreURL, toolStoreURL, kanbanStoreURL, kanbanStoreServiceToken != "")
+	checker := grantstore.NewHTTPResourceChecker(grantstore.ResourceOwners{
+		LLMBridgeServerURL:      llmBridgeServerURL,
+		LLMBridgeServiceToken:   llmBridgeServiceToken,
+		PrincipalStoreURL:       principalStoreURL,
+		SkillStoreURL:           skillStoreURL,
+		ToolStoreURL:            toolStoreURL,
+		KanbanStoreURL:          kanbanStoreURL,
+		KanbanStoreServiceToken: kanbanStoreServiceToken,
+	})
+	log.Printf("owners: principal-store=%s llm-bridge-server=%s skill-store=%s tool-store=%s kanban-store=%s (kanban-store token set: %t, llm-bridge-server token set: %t)",
+		principalStoreURL, llmBridgeServerURL, skillStoreURL, toolStoreURL, kanbanStoreURL, kanbanStoreServiceToken != "", llmBridgeServiceToken != "")
 
 	mux := http.NewServeMux()
 	serviceToken := settings.String(grantstore.SettingServiceToken)

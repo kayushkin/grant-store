@@ -37,6 +37,7 @@ func TestTheRegistryReadsTheSameValuesTheCommandAlwaysDid(t *testing.T) {
 		SettingToolStoreURL:            "http://127.0.0.1:8302",
 		SettingKanbanStoreURL:          "http://127.0.0.1:8305",
 		SettingKanbanStoreServiceToken: "",
+		SettingLLMBridgeServiceToken:   "",
 	} {
 		if got := unset.String(key); got != want {
 			t.Errorf("%s with nothing set = %q, want %q", key, got, want)
@@ -53,6 +54,7 @@ func TestTheRegistryReadsTheSameValuesTheCommandAlwaysDid(t *testing.T) {
 		"TOOL_STORE_URL":             "http://tools.example",
 		"KANBAN_STORE_URL":           "http://kanban.example",
 		"KANBAN_STORE_SERVICE_TOKEN": "kanban-token",
+		"LLMBRIDGE_SERVICE_TOKEN":    "bridge-token",
 	}
 	set, err := NewSettingsRegistry(servicesettings.MapEnvironment(operatorValues))
 	if err != nil {

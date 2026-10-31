@@ -50,6 +50,11 @@ const (
 	// from. Declared in kanban-store's internal/api/principal_access.go too;
 	// the two must match.
 	KanbanStoreServiceTokenHeader = "X-Kanban-Store-Service-Token"
+	// llmBridgeServiceTokenVariable holds the token llm-bridge-server takes
+	// from an internal service, shared with every service that calls it.
+	llmBridgeServiceTokenVariable = "LLMBRIDGE_SERVICE_TOKEN"
+	// LLMBridgeServiceTokenHeader is where llm-bridge-server reads it.
+	LLMBridgeServiceTokenHeader = "X-LLM-Bridge-Service-Token"
 )
 
 // ownerCheckTimeout bounds each owner call. A POST waits on it, and the caller is
@@ -57,26 +62,45 @@ const (
 // seconds is reported as a 502 rather than left to hang the request.
 const ownerCheckTimeout = 3 * time.Second
 
+// ResourceOwners is where each owner answers, and the credential each one
+// that gates its routes is asked with. A token may be empty, which sends none.
+type ResourceOwners struct {
+	LLMBridgeServerURL string
+	// LLMBridgeServiceToken is sent to llm-bridge-server only. Its instance,
+	// machine and peer connection routes are operator routes, so without it
+	// every such check is a 401 reported as the owner being unable to answer.
+	LLMBridgeServiceToken string
+	PrincipalStoreURL     string
+	SkillStoreURL         string
+	ToolStoreURL          string
+	KanbanStoreURL        string
+	// KanbanStoreServiceToken is sent to kanban-store only.
+	KanbanStoreServiceToken string
+}
+
 // HTTPResourceChecker asks the real owners over HTTP.
 type HTTPResourceChecker struct {
-	llmBridgeServerURL string
-	skillStoreURL      string
-	toolStoreURL       string
-	kanbanStoreURL     string
+	llmBridgeServerURL    string
+	llmBridgeServiceToken string
+	principalStoreURL     string
+	skillStoreURL         string
+	toolStoreURL          string
+	kanbanStoreURL        string
 	// kanbanStoreServiceToken is sent to kanban-store only, and only when set.
 	kanbanStoreServiceToken string
 	client                  *http.Client
 }
 
-// NewHTTPResourceChecker builds a checker against the given base URLs.
-// kanbanStoreServiceToken may be empty; see KanbanStoreServiceToken.
-func NewHTTPResourceChecker(llmBridgeServerURL, skillStoreURL, toolStoreURL, kanbanStoreURL, kanbanStoreServiceToken string) *HTTPResourceChecker {
+// NewHTTPResourceChecker builds a checker against the given owners.
+func NewHTTPResourceChecker(owners ResourceOwners) *HTTPResourceChecker {
 	return &HTTPResourceChecker{
-		llmBridgeServerURL:      strings.TrimSuffix(llmBridgeServerURL, "/"),
-		skillStoreURL:           strings.TrimSuffix(skillStoreURL, "/"),
-		toolStoreURL:            strings.TrimSuffix(toolStoreURL, "/"),
-		kanbanStoreURL:          strings.TrimSuffix(kanbanStoreURL, "/"),
-		kanbanStoreServiceToken: kanbanStoreServiceToken,
+		llmBridgeServerURL:      strings.TrimSuffix(owners.LLMBridgeServerURL, "/"),
+		llmBridgeServiceToken:   owners.LLMBridgeServiceToken,
+		principalStoreURL:       strings.TrimSuffix(owners.PrincipalStoreURL, "/"),
+		skillStoreURL:           strings.TrimSuffix(owners.SkillStoreURL, "/"),
+		toolStoreURL:            strings.TrimSuffix(owners.ToolStoreURL, "/"),
+		kanbanStoreURL:          strings.TrimSuffix(owners.KanbanStoreURL, "/"),
+		kanbanStoreServiceToken: owners.KanbanStoreServiceToken,
 		client:                  &http.Client{Timeout: ownerCheckTimeout},
 	}
 }
@@ -103,6 +127,12 @@ func (c *HTTPResourceChecker) CheckResourceExists(ctx context.Context, resourceT
 			c.kanbanStoreURL+"/api/boards/"+url.PathEscape(resourceID))
 	case ResourceTypeOperationType:
 		return c.checkOperationTypeInList(ctx, resourceID)
+	case ResourceTypePrincipal:
+		return c.checkByGet(ctx, principalStoreOwnerName, principalStoreURLVariable,
+			c.principalStoreURL+"/principals/"+url.PathEscape(resourceID))
+	case ResourceTypePeerConnection:
+		return c.checkByGet(ctx, "llm-bridge-server", llmBridgeServerURLVariable,
+			c.llmBridgeServerURL+"/peer-connections/"+url.PathEscape(resourceID))
 	}
 	// Unreachable through the store, which validates the type first. Reaching it
 	// means a type was added to resource_type.go without an owner check here.
@@ -119,6 +149,9 @@ func (c *HTTPResourceChecker) get(ctx context.Context, owner, requestURL string)
 	}
 	if owner == "kanban-store" && c.kanbanStoreServiceToken != "" {
 		request.Header.Set(KanbanStoreServiceTokenHeader, c.kanbanStoreServiceToken)
+	}
+	if owner == "llm-bridge-server" && c.llmBridgeServiceToken != "" {
+		request.Header.Set(LLMBridgeServiceTokenHeader, c.llmBridgeServiceToken)
 	}
 	response, err := c.client.Do(request)
 	if err != nil {

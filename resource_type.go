@@ -31,6 +31,13 @@ const (
 	// lists at GET /operation-types: the bridge defines the types in code, so
 	// the name is the only id they have.
 	ResourceTypeOperationType = "operation_type"
+	// ResourceTypePrincipal is a principal-store principal, as the thing a
+	// grant is about rather than the one holding it: can_start_sessions_as
+	// names the principal a service may start sessions as.
+	ResourceTypePrincipal = "principal"
+	// ResourceTypePeerConnection is one of llm-bridge-server's connections to
+	// another llm-bridge-server, such as peer_connection_000001.
+	ResourceTypePeerConnection = "peer_connection"
 )
 
 // resourceTypeDefinition is everything this store knows about one resource
@@ -92,6 +99,18 @@ var resourceTypeDefinitions = []resourceTypeDefinition{
 		name:          ResourceTypeOperationType,
 		owner:         "llm-bridge-server",
 		idDescription: "an operation type as llm-bridge-server's GET /operation-types lists it, e.g. classification.run",
+	},
+	{
+		name:          ResourceTypePrincipal,
+		owner:         "principal-store",
+		idDescription: "principal-store's principal id, e.g. principal_000001",
+		nameIsNotAnID: "a display name or email is not accepted: neither is unique",
+	},
+	{
+		name:          ResourceTypePeerConnection,
+		owner:         "llm-bridge-server",
+		idDescription: "llm-bridge-server's peer connection id, e.g. peer_connection_000001",
+		nameIsNotAnID: "the connected server's name is not accepted: a server reports its own and may change it",
 	},
 }
 

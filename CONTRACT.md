@@ -9,8 +9,9 @@ Module `github.com/kayushkin/grant-store`, root package `grantstore`, binary
 `cmd/grant-store` installed at `~/bin/grant-store`. Env: `GRANT_STORE_ADDR`
 (default `127.0.0.1:8315`), `GRANT_STORE_DATA_DIR` (default
 `~/.config/grant-store`), and the owners a grant is checked against:
-`PRINCIPAL_STORE_URL` (default `http://127.0.0.1:8314`), `LLM_BRIDGE_URL`
-(`http://127.0.0.1:8160`, for agents, instances and machines),
+`PRINCIPAL_STORE_URL` (default `http://127.0.0.1:8314`, also for principal
+resources), `LLM_BRIDGE_URL` (`http://127.0.0.1:8160`, for agents, instances,
+machines and peer connections, asked with `LLMBRIDGE_SERVICE_TOKEN`),
 `SKILL_STORE_URL` (`http://127.0.0.1:8301`), `TOOL_STORE_URL`
 (`http://127.0.0.1:8302`) — the names dash and principal-store already use.
 SQLite at `<data dir>/grant-store.db`, WAL, `?_foreign_keys=on&_txlock=immediate`.
@@ -39,7 +40,7 @@ No build tag is needed: there is no full-text index here.
 | `principal_id` | a principal-store id of a kind principal-store says holds grants (`acts_in_this_deployment`): a human, a **group** or a **peer**. Checked with principal-store on write; **not a foreign key** — it is another database's id. A **contact** is refused: it is the outside party on a ticket, not someone this deployment grants anything to |
 | `relation` | one of `GET /relations`; enforced in Go against `relation.go` |
 | `resource_type` | one of `GET /resource-types`; enforced in Go against `resource_type.go`, and must be a type the relation allows |
-| `resource_id` | the owner's id as text. Checked with the owner on write; not a foreign key. **`*`** names every resource of the type, now and later; only a relation with `accepts_all_resources` takes it (`can_use`, `can_run_as`, `can_dispatch_on`, `can_run_operation`, `can_observe_sessions_on`, the five llm-bridge-server enforces), and no owner is asked. A board grant of `*` is a 400 because kanban-store does not read it yet, and so is `works_with`, which is advisory |
+| `resource_id` | the owner's id as text. Checked with the owner on write; not a foreign key. **`*`** names every resource of the type, now and later; only a relation with `accepts_all_resources` takes it (`can_use`, `can_run_as`, `can_dispatch_on`, `can_run_operation`, `can_observe_sessions_on`, `can_call_through`), and no owner is asked. `can_start_sessions_as` refuses it: every principal at once is every principal's access. A board grant of `*` is a 400 because kanban-store does not read it yet, and so is `works_with`, which is advisory |
 | `note` | free text, trimmed: why, for whoever reads the list later |
 | `granted_at` | |
 | `revoked_at` | 0 = active. **The only removal**; see below |
@@ -70,6 +71,8 @@ Served by `GET /relations`, never hardcoded by a caller:
 | `can_view` | board | yes (kanban-store) | may see this kanban board and its cards |
 | `can_edit` | board | yes (kanban-store) | may create, move, assign and annotate cards on this board; includes `can_view` |
 | `can_administer` | board | yes (kanban-store) | may change the board's settings, columns, rules and triggers, or delete it; includes `can_edit` |
+| `can_start_sessions_as` | principal | yes (llm-bridge-server) | may start a session that runs as this principal, and drive the sessions it started that way; the session holds that principal's grants, not the starter's. Given to a `service` principal such as orchestratord. No `*` |
+| `can_call_through` | peer_connection | yes (llm-bridge-server) | may see this peer connection and call the connected server through it; read for a principal restricted to its grants |
 | `works_with` | agent, instance, machine, skill, tool | **no** | advisory: what this principal usually works with. A card's dispatch picker reads it to put an assignee's instances first. Nothing refuses anything because of it |
 
 **Enforced** means llm-bridge-server reads the relation at session start and

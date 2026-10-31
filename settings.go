@@ -30,6 +30,7 @@ const (
 	SettingToolStoreURL            = "tool_store_url"
 	SettingKanbanStoreURL          = "kanban_store_url"
 	SettingKanbanStoreServiceToken = "kanban_store_service_token"
+	SettingLLMBridgeServiceToken   = "llm_bridge_service_token"
 )
 
 // DefaultListenAddress is where the service listens with nothing set. Loopback,
@@ -69,6 +70,8 @@ func SettingDefinitions() []servicesettings.Definition {
 			Description: "Where kanban-store answers. Boards are checked there before a grant names one."},
 		{Key: SettingKanbanStoreServiceToken, EnvironmentVariable: kanbanStoreServiceTokenVariable, Kind: msg.ServiceSettingKindSecret, ValueType: msg.ServiceSettingValueTypeString,
 			Description: "The token sent to kanban-store on board checks. Unset sends none, which is right only for a kanban-store that does not enforce principals; against one that does, every board check is a 401 reported as a 502."},
+		{Key: SettingLLMBridgeServiceToken, EnvironmentVariable: llmBridgeServiceTokenVariable, Kind: msg.ServiceSettingKindSecret, ValueType: msg.ServiceSettingValueTypeString,
+			Description: "The token sent to llm-bridge-server when a grant names an instance, a machine or a peer connection, whose routes are the bridge's operator routes. Unset sends none, and every such check is a 401 reported as a 502."},
 	}
 }
 

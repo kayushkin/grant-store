@@ -38,6 +38,7 @@ func TestAllResourcesIsAcceptedWhereItIsEnforcedAndNoOwnerIsAsked(t *testing.T) 
 		{Relation: RelationCanRunAs, ResourceType: ResourceTypeAgent},
 		{Relation: RelationCanUse, ResourceType: ResourceTypeTool},
 		{Relation: RelationCanRunOperation, ResourceType: ResourceTypeOperationType},
+		{Relation: RelationCanCallThrough, ResourceType: ResourceTypePeerConnection},
 	}
 	for _, request := range accepted {
 		request.PrincipalID = "principal_000001"
@@ -54,6 +55,7 @@ func TestAllResourcesIsAcceptedWhereItIsEnforcedAndNoOwnerIsAsked(t *testing.T) 
 		{Relation: RelationCanView, ResourceType: ResourceTypeBoard},
 		{Relation: RelationCanAdminister, ResourceType: ResourceTypeBoard},
 		{Relation: RelationWorksWith, ResourceType: ResourceTypeInstance},
+		{Relation: RelationCanStartSessionsAs, ResourceType: ResourceTypePrincipal},
 	}
 	for _, request := range refused {
 		request.PrincipalID = "principal_000001"

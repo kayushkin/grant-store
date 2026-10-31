@@ -45,6 +45,8 @@ const (
 	// RelationCanObserveSessionsOn lets a principal read sessions it does
 	// not own on an instance or machine, and change nothing.
 	RelationCanObserveSessionsOn = "can_observe_sessions_on"
+	RelationCanStartSessionsAs   = "can_start_sessions_as"
+	RelationCanCallThrough       = "can_call_through"
 )
 
 // AllResources is the resource_id that names every resource of the grant's
@@ -124,6 +126,20 @@ var Relations = []RelationDefinition{
 		ResourceTypes:       []string{ResourceTypeInstance, ResourceTypeMachine},
 		Enforced:            true,
 		Description:         "may read sessions it did not start on this harness instance or machine, and change none of them; llm-bridge-server reads it on its read-only session routes, and holding none allows nothing",
+	},
+	{
+		Name:                RelationCanStartSessionsAs,
+		allResourcesRefusal: "starting sessions as every principal is every principal's access at once; name each one",
+		ResourceTypes:       []string{ResourceTypePrincipal},
+		Enforced:            true,
+		Description:         "may start a session on llm-bridge-server that runs as this principal, and drive the sessions it started that way; the session holds that principal's grants, not the starter's",
+	},
+	{
+		Name:                RelationCanCallThrough,
+		AcceptsAllResources: true,
+		ResourceTypes:       []string{ResourceTypePeerConnection},
+		Enforced:            true,
+		Description:         "may see this llm-bridge-server peer connection and call the connected server through it; llm-bridge-server reads it on GET /peer-connections and its proxy for a principal restricted to its grants",
 	},
 	{
 		Name:                RelationWorksWith,

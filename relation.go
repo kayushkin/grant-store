@@ -30,7 +30,7 @@ import (
 // stored and silently ignored there; works_with is advisory and a list of
 // everything advises nothing.
 //
-// Nothing here is normalised: the relation arrives in a body and is stored as
+// Nothing here is normalized: the relation arrives in a body and is stored as
 // a join key, so "Can_Use" is a 400 naming the right spelling, not a rewrite.
 
 const (

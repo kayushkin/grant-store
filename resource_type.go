@@ -14,7 +14,7 @@ import (
 // kanban-store's own board, which that registry does not list because a board
 // is the container cards sit in, not something a card links to.
 //
-// Unlike kind, nothing here is normalised — not case, not whitespace. The type
+// Unlike kind, nothing here is normalized — not case, not whitespace. The type
 // and the id arrive in a request and are stored as the join key, so a grant on
 // "Instance" that answered with "instance" would be a silent rewrite of what
 // the caller sent. A wrong spelling is a 400 naming the right one instead.

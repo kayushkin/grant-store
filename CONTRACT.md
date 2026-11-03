@@ -84,7 +84,7 @@ grant gets the instance's opt-ins unchanged (lenient, the operator's choice);
 create (403 `not_granted`) and at spawn, again leniently — a principal
 holding none of a relation is not restricted by it; skills are stored but not
 read yet. A grant pairing a relation with a type outside its
-list is a 400 naming the allowed types. Nothing is normalised: `Can_Use` is a
+list is a 400 naming the allowed types. Nothing is normalized: `Can_Use` is a
 400, not a rewrite.
 
 The three board relations are stored as independent tuples. **kanban-store**,

@@ -90,7 +90,7 @@ func TestTheRegistryRefusesAGrantStoreVariableNobodyDeclared(t *testing.T) {
 		t.Fatalf("NewSettingsRegistry = %v, want a refusal naming the misspelled variable", err)
 	}
 	// The owners' variables share their prefixes with other services' variables,
-	// so a neighbour of one is not this service's to refuse.
+	// so a neighbor of one is not this service's to refuse.
 	if _, err := NewSettingsRegistry(servicesettings.MapEnvironment(map[string]string{"GRANT_STORE_ADDR": ":1", "KANBAN_STORE_ADDR": ":8305", "PATH": "/bin"})); err != nil {
 		t.Errorf("a declared variable and two outside the prefix were refused: %v", err)
 	}

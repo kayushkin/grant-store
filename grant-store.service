@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/home/kayushkincom/bin/grant-store
+ExecStart=%h/bin/grant-store
 
 # Loopback, deliberately, like principal-store. This service has no auth of its
 # own; dash is the front door that adds it (at /api/grants). A wildcard bind
@@ -22,8 +22,8 @@ Environment=LLM_BRIDGE_URL=http://127.0.0.1:8160
 Environment=SKILL_STORE_URL=http://127.0.0.1:8301
 Environment=TOOL_STORE_URL=http://127.0.0.1:8302
 
-Environment=HOME=/home/kayushkincom
-WorkingDirectory=/home/kayushkincom/repos/grant-store
+Environment=HOME=%h
+WorkingDirectory=%h/repos/grant-store
 Restart=on-failure
 RestartSec=5
 
